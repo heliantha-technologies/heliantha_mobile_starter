@@ -137,7 +137,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 }
 
-class _RegisterPanel extends StatelessWidget {
+class _RegisterPanel extends StatefulWidget {
   const _RegisterPanel({
     required this.formKey,
     required this.firstname,
@@ -161,13 +161,21 @@ class _RegisterPanel extends StatelessWidget {
   final VoidCallback onRegister;
 
   @override
+  State<_RegisterPanel> createState() => _RegisterPanelState();
+}
+
+class _RegisterPanelState extends State<_RegisterPanel> {
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+  @override
   Widget build(BuildContext context) {
     return AppSurface(
       padding: const EdgeInsets.all(AppSpacing.xl),
       radius: AppRadii.lg,
       shadow: true,
       child: Form(
-        key: formKey,
+        key: widget.formKey,
         child: AutofillGroup(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,21 +197,21 @@ class _RegisterPanel extends StatelessWidget {
               ),
               const SizedBox(height: 22),
               _RegisterField(
-                controller: firstname,
+                controller: widget.firstname,
                 label: 'Prénom',
                 icon: Icons.person_outline_rounded,
                 autofillHints: const [AutofillHints.givenName],
               ),
               const SizedBox(height: 12),
               _RegisterField(
-                controller: lastname,
+                controller: widget.lastname,
                 label: 'Nom',
                 icon: Icons.badge_outlined,
                 autofillHints: const [AutofillHints.familyName],
               ),
               const SizedBox(height: 12),
               _RegisterField(
-                controller: email,
+                controller: widget.email,
                 label: 'Email',
                 icon: Icons.mail_outline_rounded,
                 keyboardType: TextInputType.emailAddress,
@@ -211,34 +219,66 @@ class _RegisterPanel extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _RegisterField(
-                controller: password,
+                controller: widget.password,
                 label: 'Mot de passe',
                 icon: Icons.lock_outline_rounded,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 autofillHints: const [AutofillHints.newPassword],
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: AppColors.muted,
+                  ),
+                  tooltip: _obscurePassword
+                      ? 'Afficher le mot de passe'
+                      : 'Masquer le mot de passe',
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
               ),
               const SizedBox(height: 12),
               TextFormField(
-                controller: confirmPassword,
-                obscureText: true,
+                controller: widget.confirmPassword,
+                obscureText: _obscureConfirmPassword,
                 textInputAction: TextInputAction.done,
                 autofillHints: const [AutofillHints.newPassword],
-                onFieldSubmitted: (_) => onRegister(),
+                onFieldSubmitted: (_) => widget.onRegister(),
                 validator: (value) {
                   if ((value ?? '').isEmpty) {
                     return 'Champ requis';
                   }
-                  if (value != password.text) {
+                  if (value != widget.password.text) {
                     return 'Les mots de passe ne correspondent pas.';
                   }
                   return null;
                 },
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Confirmer le mot de passe',
-                  prefixIcon: Icon(Icons.lock_reset_rounded),
+                  prefixIcon: const Icon(Icons.lock_reset_rounded),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirmPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: AppColors.muted,
+                    ),
+                    tooltip: _obscureConfirmPassword
+                        ? 'Afficher le mot de passe'
+                        : 'Masquer le mot de passe',
+                    onPressed: () {
+                      setState(() {
+                        _obscureConfirmPassword = !_obscureConfirmPassword;
+                      });
+                    },
+                  ),
                 ),
               ),
-              if (error != null) ...[
+              if (widget.error != null) ...[
                 const SizedBox(height: 12),
                 Container(
                   width: double.infinity,
@@ -248,7 +288,7 @@ class _RegisterPanel extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    error!,
+                    widget.error!,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.danger,
                           fontWeight: FontWeight.w700,
@@ -260,14 +300,14 @@ class _RegisterPanel extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: loading ? null : onRegister,
-                  icon: loading
+                  onPressed: widget.loading ? null : widget.onRegister,
+                  icon: widget.loading
                       ? const SizedBox.square(
                           dimension: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.person_add_alt_1_rounded),
-                  label: Text(loading ? 'Création...' : 'Créer un compte'),
+                  label: Text(widget.loading ? 'Création...' : 'Créer un compte'),
                 ),
               ),
             ],
@@ -286,6 +326,7 @@ class _RegisterField extends StatelessWidget {
     this.keyboardType,
     this.obscureText = false,
     this.autofillHints,
+    this.suffixIcon,
   });
 
   final TextEditingController controller;
@@ -294,6 +335,7 @@ class _RegisterField extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool obscureText;
   final Iterable<String>? autofillHints;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -307,6 +349,7 @@ class _RegisterField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon),
+        suffixIcon: suffixIcon,
       ),
     );
   }

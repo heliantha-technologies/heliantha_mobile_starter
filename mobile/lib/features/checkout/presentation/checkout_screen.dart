@@ -242,7 +242,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         _orderConfirmed = true;
         _confirming = false;
       });
-      _handleSuccessfulOrder(result, preview);
+      _handleSuccessfulOrder(result, preview, isConnected: isConnected);
     } catch (error) {
       setState(
         () => _message = friendlyCheckoutMessage(error),
@@ -256,20 +256,26 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   Future<void> _handleSuccessfulOrder(
     CheckoutConfirmResult result,
-    CheckoutPreview preview,
-  ) async {
+    CheckoutPreview preview, {
+    required bool isConnected,
+  }) async {
     if (_successHandled) {
       return;
     }
     _successHandled = true;
     ref.read(cartProvider.notifier).clear();
-    await _showOrderSuccessDialog(result, preview);
+    await _showOrderSuccessDialog(
+      result,
+      preview,
+      isConnected: isConnected,
+    );
   }
 
   Future<void> _showOrderSuccessDialog(
     CheckoutConfirmResult result,
-    CheckoutPreview preview,
-  ) async {
+    CheckoutPreview preview, {
+    required bool isConnected,
+  }) async {
     var closedByAction = false;
     Future<void> navigateTo(String location) async {
       if (_successNavigationDone || !mounted) {
@@ -283,19 +289,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       context.go(location);
     }
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (!closedByAction && mounted && !_successNavigationDone) {
-        navigateTo('/orders');
-      }
-    });
+    if (isConnected) {
+      Future.delayed(const Duration(seconds: 3), () {
+        if (!closedByAction && mounted && !_successNavigationDone) {
+          navigateTo('/orders');
+        }
+      });
+    }
 
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => _OrderSuccessDialog(
+      builder: (dialogContext) => OrderSuccessDialog(
         result: result,
         fallbackTotal: preview.totals.totalTtc,
         fallbackCurrency: preview.totals.currencySymbol,
+        isConnected: isConnected,
         onOrders: () => navigateTo('/orders'),
         onHome: () => navigateTo('/'),
       ),
@@ -584,8 +593,9 @@ class _GuestStep extends StatelessWidget {
   }
 }
 
-class _LoginStep extends StatelessWidget {
-  const _LoginStep({
+class CheckoutLoginStep extends StatefulWidget {
+  const CheckoutLoginStep({
+    super.key,
     required this.email,
     required this.password,
     required this.loading,
@@ -598,34 +608,59 @@ class _LoginStep extends StatelessWidget {
   final VoidCallback onLogin;
 
   @override
+  State<CheckoutLoginStep> createState() => _CheckoutLoginStepState();
+}
+
+typedef _LoginStep = CheckoutLoginStep;
+
+class _CheckoutLoginStepState extends State<CheckoutLoginStep> {
+  bool _obscurePassword = true;
+
+  @override
   Widget build(BuildContext context) {
     return _Panel(
       title: 'Connexion',
       child: Column(
         children: [
           _RequiredField(
-            controller: email,
+            controller: widget.email,
             label: 'E-mail',
             keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: 12),
           _RequiredField(
-            controller: password,
+            controller: widget.password,
             label: 'Mot de passe',
-            obscureText: true,
+            obscureText: _obscurePassword,
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                color: AppColors.muted,
+              ),
+              tooltip: _obscurePassword
+                  ? 'Afficher le mot de passe'
+                  : 'Masquer le mot de passe',
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+            ),
           ),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: loading ? null : onLogin,
-              icon: loading
+              onPressed: widget.loading ? null : widget.onLogin,
+              icon: widget.loading
                   ? const SizedBox.square(
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.login_rounded),
-              label: Text(loading ? 'Connexion...' : 'Connexion'),
+              label: Text(widget.loading ? 'Connexion...' : 'Connexion'),
             ),
           ),
         ],
@@ -794,11 +829,13 @@ class _ChoiceLine extends StatelessWidget {
   }
 }
 
-class _OrderSuccessDialog extends StatelessWidget {
-  const _OrderSuccessDialog({
+class OrderSuccessDialog extends StatelessWidget {
+  const OrderSuccessDialog({
+    super.key,
     required this.result,
     required this.fallbackTotal,
     required this.fallbackCurrency,
+    required this.isConnected,
     required this.onOrders,
     required this.onHome,
   });
@@ -806,6 +843,7 @@ class _OrderSuccessDialog extends StatelessWidget {
   final CheckoutConfirmResult result;
   final double fallbackTotal;
   final String fallbackCurrency;
+  final bool isConnected;
   final VoidCallback onOrders;
   final VoidCallback onHome;
 
@@ -814,6 +852,13 @@ class _OrderSuccessDialog extends StatelessWidget {
     final total = result.total ?? fallbackTotal;
     final currency = result.currency ?? fallbackCurrency;
     final formattedTotal = formatMoney(total, currency: currency);
+    final reference = result.reference?.trim();
+    final hasReference = reference != null && reference.isNotEmpty;
+
+    final title = isConnected ? 'Commande confirmée !' : 'Commande enregistrée';
+    final message = isConnected
+        ? 'Votre commande a bien été enregistrée.'
+        : 'Merci pour votre confiance ! Votre commande a bien été enregistrée. Notre équipe va la traiter prochainement.';
 
     return PopScope(
       canPop: false,
@@ -842,7 +887,7 @@ class _OrderSuccessDialog extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               Text(
-                'Commande confirmée !',
+                title,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: AppColors.ink,
@@ -851,7 +896,7 @@ class _OrderSuccessDialog extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Votre commande a bien été enregistrée.',
+                message,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: AppColors.muted,
@@ -868,11 +913,24 @@ class _OrderSuccessDialog extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    if (result.reference?.isNotEmpty == true)
-                      _SuccessMetaRow(
-                        label: 'Référence',
-                        value: result.reference!,
-                      ),
+                    if (hasReference)
+                      if (isConnected)
+                        _SuccessMetaRow(
+                          label: 'Référence',
+                          value: reference,
+                        )
+                      else ...[
+                        Text(
+                          'Commande n°$reference',
+                          textAlign: TextAlign.center,
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    color: AppColors.navy,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                     _SuccessMetaRow(
                       label: 'Total',
                       value: formattedTotal,
@@ -880,32 +938,44 @@ class _OrderSuccessDialog extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Vous pouvez suivre son état depuis Mes commandes.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.muted,
-                    ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: onOrders,
-                  icon: const Icon(Icons.receipt_long_rounded),
-                  label: const Text('Voir ma commande'),
+              if (isConnected) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Vous pouvez suivre son état depuis Mes commandes.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.muted,
+                      ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: onHome,
-                  icon: const Icon(Icons.home_rounded),
-                  label: const Text("Retour à l'accueil"),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: onOrders,
+                    icon: const Icon(Icons.receipt_long_rounded),
+                    label: const Text('Voir ma commande'),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onHome,
+                    icon: const Icon(Icons.home_rounded),
+                    label: const Text('Retour à l’accueil'),
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: onHome,
+                    icon: const Icon(Icons.home_rounded),
+                    label: const Text('Retour à l’accueil'),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1037,12 +1107,14 @@ class _RequiredField extends StatelessWidget {
     required this.label,
     this.keyboardType,
     this.obscureText = false,
+    this.suffixIcon,
   });
 
   final TextEditingController controller;
   final String label;
   final TextInputType? keyboardType;
   final bool obscureText;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -1056,7 +1128,10 @@ class _RequiredField extends StatelessWidget {
         }
         return null;
       },
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        labelText: label,
+        suffixIcon: suffixIcon,
+      ),
     );
   }
 }

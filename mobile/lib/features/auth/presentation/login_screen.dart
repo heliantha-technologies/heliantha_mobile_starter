@@ -125,7 +125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-class _LoginPanel extends StatelessWidget {
+class _LoginPanel extends StatefulWidget {
   const _LoginPanel({
     required this.email,
     required this.password,
@@ -139,6 +139,13 @@ class _LoginPanel extends StatelessWidget {
   final bool loading;
   final String? error;
   final VoidCallback onLogin;
+
+  @override
+  State<_LoginPanel> createState() => _LoginPanelState();
+}
+
+class _LoginPanelState extends State<_LoginPanel> {
+  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +174,7 @@ class _LoginPanel extends StatelessWidget {
             ),
             const SizedBox(height: 22),
             TextField(
-              controller: email,
+              controller: widget.email,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               autofillHints: const [AutofillHints.email],
@@ -178,17 +185,33 @@ class _LoginPanel extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: password,
-              obscureText: true,
+              controller: widget.password,
+              obscureText: _obscurePassword,
               textInputAction: TextInputAction.done,
               autofillHints: const [AutofillHints.password],
-              onSubmitted: (_) => onLogin(),
-              decoration: const InputDecoration(
+              onSubmitted: (_) => widget.onLogin(),
+              decoration: InputDecoration(
                 labelText: 'Mot de passe',
-                prefixIcon: Icon(Icons.lock_outline_rounded),
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: AppColors.muted,
+                  ),
+                  tooltip: _obscurePassword
+                      ? 'Afficher le mot de passe'
+                      : 'Masquer le mot de passe',
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
               ),
             ),
-            if (error != null) ...[
+            if (widget.error != null) ...[
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
@@ -198,7 +221,7 @@ class _LoginPanel extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  error!,
+                  widget.error!,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.danger,
                         fontWeight: FontWeight.w700,
@@ -210,14 +233,14 @@ class _LoginPanel extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: loading ? null : onLogin,
-                icon: loading
+                onPressed: widget.loading ? null : widget.onLogin,
+                icon: widget.loading
                     ? const SizedBox.square(
                         dimension: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.login_rounded),
-                label: Text(loading ? 'Connexion...' : 'Se connecter'),
+                label: Text(widget.loading ? 'Connexion...' : 'Se connecter'),
               ),
             ),
           ],

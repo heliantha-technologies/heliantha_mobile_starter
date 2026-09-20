@@ -12,6 +12,7 @@ import '../../features/checkout/presentation/checkout_start_screen.dart';
 import '../../features/checkout/presentation/checkout_screen.dart';
 import '../../features/favorites/presentation/favorites_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/legal/presentation/privacy_policy_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/orders/presentation/orders_screen.dart';
 import '../../features/cart/providers/cart_provider.dart';
@@ -162,6 +163,11 @@ final appRouter = GoRouter(
       path: '/checkout',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (_, __) => const CheckoutScreen(),
+    ),
+    GoRoute(
+      path: '/privacy',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (_, __) => const PrivacyPolicyScreen(),
     ),
   ],
 );

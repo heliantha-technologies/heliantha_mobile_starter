@@ -66,6 +66,7 @@ class AccountScreen extends ConsumerWidget {
                     _AccountActions(
                       onOrders: () => context.push('/orders'),
                       onAddresses: () => context.push('/addresses'),
+                      onPrivacy: () => context.push('/privacy'),
                       onLogout: () async {
                         await ref
                             .read(fcmServiceProvider)
@@ -153,11 +154,13 @@ class _AccountActions extends StatelessWidget {
   const _AccountActions({
     required this.onOrders,
     required this.onAddresses,
+    required this.onPrivacy,
     required this.onLogout,
   });
 
   final VoidCallback onOrders;
   final VoidCallback onAddresses;
+  final VoidCallback onPrivacy;
   final VoidCallback onLogout;
 
   @override
@@ -185,6 +188,18 @@ class _AccountActions extends StatelessWidget {
             title: 'Mes adresses',
             subtitle: 'Livraison et facturation',
             onTap: onAddresses,
+          ),
+        ),
+        const SizedBox(height: 10),
+        AppSurface(
+          padding: EdgeInsets.zero,
+          radius: AppRadii.lg,
+          shadow: true,
+          child: AppActionTile(
+            icon: Icons.privacy_tip_outlined,
+            title: 'Politique de confidentialité',
+            subtitle: 'Protection des données et vie privée',
+            onTap: onPrivacy,
           ),
         ),
         const SizedBox(height: 10),
@@ -254,6 +269,7 @@ class _GuestView extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               const _ContactSection(),
+              const _LegalSection(),
             ],
           ),
         ),
@@ -438,3 +454,36 @@ class _ContactTile extends StatelessWidget {
     );
   }
 }
+
+class _LegalSection extends StatelessWidget {
+  const _LegalSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 18),
+        Text(
+          'Informations légales',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.muted,
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+        const SizedBox(height: 8),
+        AppSurface(
+          padding: EdgeInsets.zero,
+          radius: AppRadii.lg,
+          child: AppActionTile(
+            icon: Icons.policy_outlined,
+            title: 'Politique de confidentialité',
+            subtitle: 'Protection des données et vie privée',
+            onTap: () => context.push('/privacy'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/navigation_helpers.dart';
 import '../../../shared/models/order.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_tokens.dart';
@@ -9,6 +10,7 @@ import '../../../shared/utils/friendly_errors.dart';
 import '../../../shared/utils/money.dart';
 import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../providers/orders_provider.dart';
 
 class OrdersScreen extends ConsumerWidget {
@@ -16,6 +18,58 @@ class OrdersScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(currentUserProvider);
+    final user = authState.valueOrNull;
+
+    if (authState.isLoading) {
+      return const Scaffold(
+        appBar: AppTopBar(
+          subtitle: 'Commandes client',
+          showBack: true,
+          backFallbackLocation: '/account',
+        ),
+        body: SafeArea(
+          child: _OrdersSkeleton(),
+        ),
+      );
+    }
+
+    if (user == null) {
+      return Scaffold(
+        appBar: const AppTopBar(
+          subtitle: 'Commandes client',
+          showBack: true,
+          backFallbackLocation: '/account',
+        ),
+        body: SafeArea(
+          child: ResponsivePagePadding(
+            child: AppStatusPanel(
+              icon: Icons.lock_outline_rounded,
+              title: 'Connexion requise',
+              message:
+                  'Connectez-vous pour consulter vos commandes et suivre leur état.',
+              action: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () => context.push(loginLocationFor('/orders')),
+                    icon: const Icon(Icons.login_rounded),
+                    label: const Text('Se connecter'),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () => context.go('/'),
+                    icon: const Icon(Icons.home_rounded),
+                    label: const Text('Retour à l’accueil'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final orders = ref.watch(ordersProvider);
 
     return Scaffold(
@@ -274,6 +328,46 @@ class OrderDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(currentUserProvider);
+    final user = authState.valueOrNull;
+
+    if (user == null && initialOrder == null) {
+      return Scaffold(
+        appBar: const AppTopBar(
+          subtitle: 'Détail commande',
+          showBack: true,
+          backFallbackLocation: '/orders',
+        ),
+        body: SafeArea(
+          child: ResponsivePagePadding(
+            child: AppStatusPanel(
+              icon: Icons.lock_outline_rounded,
+              title: 'Connexion requise',
+              message:
+                  'Connectez-vous pour retrouver le détail de cette commande.',
+              action: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () =>
+                        context.push(loginLocationFor('/orders/$orderId')),
+                    icon: const Icon(Icons.login_rounded),
+                    label: const Text('Se connecter'),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () => context.go('/'),
+                    icon: const Icon(Icons.home_rounded),
+                    label: const Text('Retour à l’accueil'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final orders = ref.watch(ordersProvider);
 
     return Scaffold(
