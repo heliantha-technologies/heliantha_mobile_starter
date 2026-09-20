@@ -55,3 +55,5 @@ prestashop_bridge_example/helianthamobilebridge.zip
 
 backend/secrets/
 *firebase-admin*.json
+
+mobile/android/key.properties
