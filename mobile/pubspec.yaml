@@ -18,6 +18,7 @@ dependencies:
   cached_network_image: ^3.4.1
   intl: ^0.20.2
   url_launcher: ^6.3.1
+  file_saver: ^0.3.1
   firebase_core: 4.13.0
   firebase_messaging: 16.5.0
   flutter_local_notifications: ^22.3.0
@@ -32,3 +33,4 @@ flutter:
   assets:
     - assets/brand/helin.jpeg
     - assets/brand/fond_arriere_plan.png
+    - assets/docs/RIB CIH Heliantha (1).pdf

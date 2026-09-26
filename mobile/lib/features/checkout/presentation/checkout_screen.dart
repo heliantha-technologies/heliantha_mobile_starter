@@ -1,4 +1,9 @@
+import 'dart:typed_data';
+
+import 'package:file_saver/file_saver.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -15,6 +20,8 @@ import '../../cart/providers/cart_provider.dart';
 import '../../notifications/services/fcm_service.dart';
 import '../domain/checkout_models.dart';
 import '../providers/checkout_provider.dart';
+
+const _bankWireModule = 'ps_wirepayment';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
@@ -242,7 +249,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         _orderConfirmed = true;
         _confirming = false;
       });
-      _handleSuccessfulOrder(result, preview, isConnected: isConnected);
+      _handleSuccessfulOrder(
+        result,
+        preview,
+        isConnected: isConnected,
+        paymentModule: paymentModule,
+      );
     } catch (error) {
       setState(
         () => _message = friendlyCheckoutMessage(error),
@@ -258,6 +270,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     CheckoutConfirmResult result,
     CheckoutPreview preview, {
     required bool isConnected,
+    required String paymentModule,
   }) async {
     if (_successHandled) {
       return;
@@ -268,6 +281,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       result,
       preview,
       isConnected: isConnected,
+      paymentModule: paymentModule,
     );
   }
 
@@ -275,6 +289,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     CheckoutConfirmResult result,
     CheckoutPreview preview, {
     required bool isConnected,
+    required String? paymentModule,
   }) async {
     var closedByAction = false;
     Future<void> navigateTo(String location) async {
@@ -289,7 +304,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       context.go(location);
     }
 
-    if (isConnected) {
+    final isBankWire =
+        paymentModule == _bankWireModule || result.paymentDetails != null;
+
+    if (isConnected && !isBankWire) {
       Future.delayed(const Duration(seconds: 3), () {
         if (!closedByAction && mounted && !_successNavigationDone) {
           navigateTo('/orders');
@@ -305,6 +323,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         fallbackTotal: preview.totals.totalTtc,
         fallbackCurrency: preview.totals.currencySymbol,
         isConnected: isConnected,
+        isBankWire: isBankWire,
         onOrders: () => navigateTo('/orders'),
         onHome: () => navigateTo('/'),
       ),
@@ -747,9 +766,54 @@ class _CheckoutOptions extends StatelessWidget {
                 selected: payment.module == selectedPaymentModule,
                 icon: Icons.payments_rounded,
                 title: Text(payment.name),
-                subtitle: const Text('Disponible pour ce panier'),
+                subtitle: payment.module == _bankWireModule
+                    ? const _BankWirePaymentHint()
+                    : const Text('Disponible pour ce panier'),
                 onTap: () => onPaymentChanged(payment.module),
               ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BankWirePaymentHint extends StatelessWidget {
+  const _BankWirePaymentHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.softSun,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(
+          color: AppColors.sun.withValues(alpha: 0.55),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.info_outline_rounded,
+              color: AppColors.navy,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              'Les coordonnées bancaires (RIB, titulaire) vous seront fournies à la validation de la commande.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+            ),
+          ),
         ],
       ),
     );
@@ -836,6 +900,7 @@ class OrderSuccessDialog extends StatelessWidget {
     required this.fallbackTotal,
     required this.fallbackCurrency,
     required this.isConnected,
+    required this.isBankWire,
     required this.onOrders,
     required this.onHome,
   });
@@ -844,6 +909,7 @@ class OrderSuccessDialog extends StatelessWidget {
   final double fallbackTotal;
   final String fallbackCurrency;
   final bool isConnected;
+  final bool isBankWire;
   final VoidCallback onOrders;
   final VoidCallback onHome;
 
@@ -854,6 +920,17 @@ class OrderSuccessDialog extends StatelessWidget {
     final formattedTotal = formatMoney(total, currency: currency);
     final reference = result.reference?.trim();
     final hasReference = reference != null && reference.isNotEmpty;
+
+    if (isBankWire || result.paymentDetails != null) {
+      return _BankWireOrderDialog(
+        details: result.paymentDetails ?? const BankWireDetails(),
+        reference: hasReference ? reference : null,
+        formattedTotal: formattedTotal,
+        isConnected: isConnected,
+        onOrders: onOrders,
+        onHome: onHome,
+      );
+    }
 
     final title = isConnected ? 'Commande confirmée !' : 'Commande enregistrée';
     final message = isConnected
@@ -1518,6 +1595,437 @@ class _SkeletonBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(AppRadii.sm),
+      ),
+    );
+  }
+}
+
+class _BankWireOrderDialog extends StatelessWidget {
+  const _BankWireOrderDialog({
+    required this.details,
+    required this.reference,
+    required this.formattedTotal,
+    required this.isConnected,
+    required this.onOrders,
+    required this.onHome,
+  });
+
+  final BankWireDetails details;
+  final String? reference;
+  final String formattedTotal;
+  final bool isConnected;
+  final VoidCallback onOrders;
+  final VoidCallback onHome;
+
+  void _copy(BuildContext context, String value, String label) {
+    Clipboard.setData(ClipboardData(text: value));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('$label copié dans le presse-papiers.'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final owner = details.owner?.trim();
+    final rib = details.details?.trim();
+    final phone = details.phone?.trim();
+    final customText = details.customText?.trim();
+    final hasReference = reference != null && reference!.isNotEmpty;
+    final hasBankDetails = (owner != null && owner.isNotEmpty) ||
+        (rib != null && rib.isNotEmpty) ||
+        (phone != null && phone.isNotEmpty) ||
+        (customText != null && customText.isNotEmpty);
+
+    Future<void> downloadDetails() async {
+      try {
+        final pdfData = await rootBundle.load(
+          'assets/docs/RIB CIH Heliantha (1).pdf',
+        );
+        final fileBytes = pdfData.buffer.asUint8List(
+          pdfData.offsetInBytes,
+          pdfData.lengthInBytes,
+        );
+        final fileName =
+            hasReference ? 'RIB_CIH_Heliantha_$reference' : 'RIB_CIH_Heliantha';
+        final savedPath = kIsWeb
+            ? await FileSaver.instance.saveFile(
+                name: fileName,
+                bytes: fileBytes,
+                fileExtension: 'pdf',
+                mimeType: MimeType.pdf,
+              )
+            : await FileSaver.instance.saveAs(
+                name: fileName,
+                bytes: fileBytes,
+                fileExtension: 'pdf',
+                mimeType: MimeType.pdf,
+              );
+        if (savedPath != null && context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text('Coordonnées de virement téléchargées.'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+        }
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text('Telechargement impossible. Reessayez.'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+        }
+      }
+    }
+
+    return PopScope(
+      canPop: false,
+      child: Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 560,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.94,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Virement bancaire',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: AppColors.ink,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: downloadDetails,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      icon: const Icon(Icons.download_rounded, size: 18),
+                      label: const Text('Télécharger'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.softBlue,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                  ),
+                  child: Column(
+                    children: [
+                      if (hasReference) ...[
+                        Text(
+                          'Référence de commande',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.muted,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 4,
+                          children: [
+                            Text(
+                              reference!,
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    color: AppColors.blue,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                            ),
+                            IconButton(
+                              tooltip: 'Copier la référence',
+                              onPressed: () => _copy(
+                                context,
+                                reference!,
+                                'Référence de commande',
+                              ),
+                              icon: const Icon(Icons.copy_rounded, size: 19),
+                              color: AppColors.blue,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 12),
+                      ],
+                      _SuccessMetaRow(label: 'Total', value: formattedTotal),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.navy, AppColors.blue],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadii.lg),
+                    boxShadow: AppShadows.soft,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.account_balance_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Coordonnées bancaires',
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(AppRadii.sm),
+                            ),
+                            child: Text(
+                              'VIREMENT',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.7,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (owner != null && owner.isNotEmpty)
+                        _BankWireField(label: 'Titulaire', value: owner),
+                      if (rib != null && rib.isNotEmpty)
+                        _BankWireField(
+                          label: 'RIB / coordonnées',
+                          value: rib,
+                          onCopy: () => _copy(context, rib, 'RIB'),
+                        ),
+                      if (phone != null && phone.isNotEmpty)
+                        _BankWireField(label: 'Téléphone', value: phone),
+                      if (customText != null && customText.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(AppRadii.sm),
+                          ),
+                          child: Text(
+                            customText,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.white,
+                                  height: 1.35,
+                                ),
+                          ),
+                        ),
+                      ],
+                      if (!hasBankDetails) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(AppRadii.sm),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2),
+                                child: Icon(
+                                  Icons.hourglass_top_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Les coordonnées bancaires sont en cours de récupération. Vérifiez votre commande ou contactez Heliantha si elles ne s’affichent pas.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        height: 1.35,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (hasReference) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.softSun,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.info_outline_rounded,
+                            color: AppColors.navy,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Indiquez impérativement la référence $reference dans le motif de votre virement.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.navy,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                if (isConnected) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: onOrders,
+                      icon: const Icon(Icons.receipt_long_rounded),
+                      label: const Text('Voir ma commande'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: onHome,
+                      icon: const Icon(Icons.home_rounded),
+                      label: const Text('Retour à l’accueil'),
+                    ),
+                  ),
+                ] else
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: onHome,
+                      icon: const Icon(Icons.home_rounded),
+                      label: const Text('Retour à l’accueil'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BankWireField extends StatelessWidget {
+  const _BankWireField({
+    required this.label,
+    required this.value,
+    this.onCopy,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback? onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.72),
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                SelectableText(
+                  value,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        height: 1.3,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          if (onCopy != null) ...[
+            const SizedBox(width: 6),
+            IconButton(
+              tooltip: 'Copier le RIB',
+              onPressed: onCopy,
+              icon: const Icon(Icons.copy_rounded, size: 19),
+              color: Colors.white,
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ],
       ),
     );
   }

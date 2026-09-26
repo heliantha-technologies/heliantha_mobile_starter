@@ -43,6 +43,7 @@ void main() {
               fallbackTotal: 199.0,
               fallbackCurrency: 'MAD',
               isConnected: false,
+              isBankWire: false,
               onOrders: () => ordersNavigated = true,
               onHome: () => homeNavigated = true,
             ),
@@ -122,6 +123,7 @@ void main() {
               fallbackTotal: 450.0,
               fallbackCurrency: 'MAD',
               isConnected: true,
+              isBankWire: false,
               onOrders: () => ordersNavigated = true,
               onHome: () => homeNavigated = true,
             ),
@@ -181,4 +183,3 @@ void main() {
     });
   });
 }
-

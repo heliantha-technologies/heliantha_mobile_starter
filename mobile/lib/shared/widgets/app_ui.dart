@@ -50,12 +50,108 @@ class AppSectionHeader extends StatelessWidget {
         ),
         if (actionLabel != null && onAction != null) ...[
           const SizedBox(width: 12),
-          TextButton(
-            onPressed: onAction,
-            child: Text(actionLabel!),
+          _SectionActionButton(
+            label: actionLabel!,
+            onTap: onAction!,
           ),
         ],
       ],
+    );
+  }
+}
+
+class _SectionActionButton extends StatefulWidget {
+  const _SectionActionButton({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  State<_SectionActionButton> createState() => _SectionActionButtonState();
+}
+
+class _SectionActionButtonState extends State<_SectionActionButton> {
+  bool _hovered = false;
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = _hovered || _pressed;
+    final borderRadius = BorderRadius.circular(AppRadii.md);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() {
+        _hovered = false;
+        _pressed = false;
+      }),
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOutCubic,
+        scale: _pressed ? 0.97 : 1,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: borderRadius,
+          child: InkWell(
+            borderRadius: borderRadius,
+            onTap: widget.onTap,
+            onTapDown: (_) => setState(() => _pressed = true),
+            onTapCancel: () => setState(() => _pressed = false),
+            onTapUp: (_) => setState(() => _pressed = false),
+            splashColor: AppColors.sun.withValues(alpha: 0.18),
+            highlightColor: AppColors.sun.withValues(alpha: 0.10),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              constraints: const BoxConstraints(minHeight: 34, minWidth: 88),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: active ? AppColors.sun : AppColors.surface,
+                borderRadius: borderRadius,
+                border: Border.all(
+                  color: active ? AppColors.sun : AppColors.premiumLine,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.navy.withValues(
+                      alpha: active ? 0.12 : 0.06,
+                    ),
+                    blurRadius: active ? 14 : 9,
+                    offset: Offset(0, active ? 7 : 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: AppColors.navy,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0,
+                          ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 16,
+                    color: AppColors.navy.withValues(alpha: 0.92),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

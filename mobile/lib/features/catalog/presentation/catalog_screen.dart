@@ -47,6 +47,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   int _requestVersion = 0;
   Timer? _searchDebounce;
   bool _openedCategoriesFromRoute = false;
+  bool _showSmartScrollButton = false;
 
   bool get _hasSearch => _search.text.trim().isNotEmpty;
   int? get _categoryFilter => widget.initialCategory;
@@ -114,9 +115,38 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     if (!_scrollController.hasClients) {
       return;
     }
+    final shouldShow = _scrollController.offset > 160;
+    if (shouldShow != _showSmartScrollButton && mounted) {
+      setState(() => _showSmartScrollButton = shouldShow);
+    }
     if (_scrollController.position.extentAfter < _loadMoreThreshold) {
       _loadMore();
     }
+  }
+
+  Future<void> _smartScrollBack() async {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    final current = position.pixels;
+    final max = position.maxScrollExtent;
+    final middle = max * 0.48;
+    final target = current > middle + 120 ? middle : 0.0;
+    final distance = (current - target).abs();
+    final duration = Duration(
+      milliseconds: (260 + distance / 5).clamp(320, 760).round(),
+    );
+    final clampedTarget = target
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+
+    await _scrollController.animateTo(
+      clampedTarget,
+      duration: duration,
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _loadMoreIfContentIsShort() {
@@ -316,6 +346,10 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       appBar: AppTopBar(
         subtitle: 'Catalogue solaire',
         actions: _contextActions(storeContext) ?? const [],
+      ),
+      floatingActionButton: _SmartScrollBackButton(
+        visible: _showSmartScrollButton,
+        onPressed: _smartScrollBack,
       ),
       body: SafeArea(
         child: ResponsivePagePadding(
@@ -713,6 +747,50 @@ class _CatalogSearchBar extends StatelessWidget {
         ),
       ],
       onSubmitted: (_) => onSearch(),
+    );
+  }
+}
+
+class _SmartScrollBackButton extends StatelessWidget {
+  const _SmartScrollBackButton({
+    required this.visible,
+    required this.onPressed,
+  });
+
+  final bool visible;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        opacity: visible ? 1 : 0,
+        child: AnimatedSlide(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          offset: visible ? Offset.zero : const Offset(0, 0.24),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 76),
+            child: FloatingActionButton.small(
+              heroTag: 'catalog-smart-scroll-back',
+              tooltip: 'Remonter',
+              elevation: 4,
+              highlightElevation: 6,
+              backgroundColor: AppColors.surface,
+              foregroundColor: AppColors.navy,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: AppColors.premiumLine),
+              ),
+              onPressed: onPressed,
+              child: const Icon(Icons.keyboard_arrow_up_rounded, size: 24),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

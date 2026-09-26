@@ -195,6 +195,7 @@ class CheckoutConfirmResult {
     this.total,
     this.currency,
     this.status,
+    this.paymentDetails,
   });
 
   final int? orderId;
@@ -202,6 +203,7 @@ class CheckoutConfirmResult {
   final double? total;
   final String? currency;
   final String? status;
+  final BankWireDetails? paymentDetails;
 
   factory CheckoutConfirmResult.fromJson(Map<String, dynamic> json) {
     return CheckoutConfirmResult(
@@ -210,6 +212,40 @@ class CheckoutConfirmResult {
       total: (json['total'] as num?)?.toDouble(),
       currency: json['currency']?.toString(),
       status: json['status']?.toString(),
+      paymentDetails: json['payment_details'] is Map
+          ? BankWireDetails.fromJson(
+              Map<String, dynamic>.from(json['payment_details'] as Map),
+            )
+          : null,
+    );
+  }
+}
+
+class BankWireDetails {
+  const BankWireDetails({
+    this.owner,
+    this.details,
+    this.address,
+    this.phone,
+    this.reservationDays,
+    this.customText,
+  });
+
+  final String? owner;
+  final String? details;
+  final String? address;
+  final String? phone;
+  final int? reservationDays;
+  final String? customText;
+
+  factory BankWireDetails.fromJson(Map<String, dynamic> json) {
+    return BankWireDetails(
+      owner: json['owner']?.toString(),
+      details: json['details']?.toString(),
+      address: json['address']?.toString(),
+      phone: json['phone']?.toString(),
+      reservationDays: (json['reservation_days'] as num?)?.toInt(),
+      customText: json['custom_text']?.toString(),
     );
   }
 }
