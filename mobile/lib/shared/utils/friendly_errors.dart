@@ -11,19 +11,11 @@ class FriendlyError {
 }
 
 FriendlyError friendlyLoadError(Object? error) {
-  if (error is DioException) {
-    switch (error.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-      case DioExceptionType.connectionError:
-        return const FriendlyError(
-          title: 'Connexion indisponible',
-          message: 'Vérifiez votre connexion Internet puis réessayez.',
-        );
-      default:
-        break;
-    }
+  if (error is DioException && _isConnectionFailure(error)) {
+    return const FriendlyError(
+      title: 'Connexion indisponible',
+      message: 'Vérifiez votre connexion Internet puis réessayez.',
+    );
   }
 
   return const FriendlyError(
@@ -58,4 +50,29 @@ String friendlyCheckoutMessage(Object? error) {
     return 'Certaines informations semblent incorrectes. Vérifiez les champs indiqués.';
   }
   return 'Nous n’avons pas pu finaliser votre commande pour le moment. Veuillez réessayer.';
+}
+
+bool _isConnectionFailure(DioException error) {
+  if (error.response != null) {
+    return false;
+  }
+
+  switch (error.type) {
+    case DioExceptionType.connectionTimeout:
+    case DioExceptionType.sendTimeout:
+    case DioExceptionType.receiveTimeout:
+    case DioExceptionType.connectionError:
+      return true;
+    case DioExceptionType.unknown:
+      return _isSocketLikeError(error.error);
+    default:
+      return false;
+  }
+}
+
+bool _isSocketLikeError(Object? error) {
+  final type = error.runtimeType.toString();
+  return type == 'SocketException' ||
+      type == '_ClientSocketException' ||
+      type == 'HandshakeException';
 }

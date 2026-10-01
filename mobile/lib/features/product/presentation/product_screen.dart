@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/router/navigation_helpers.dart';
 import '../../../shared/models/product.dart';
 import '../../../shared/theme/app_colors.dart';
@@ -135,6 +136,7 @@ class _ProductBody extends ConsumerWidget {
                     ),
                   );
                 },
+                onShare: () => _shareProduct(context, product, price),
               );
 
               return Column(
@@ -711,6 +713,41 @@ class _SkeletonBox extends StatelessWidget {
   }
 }
 
+const _productShareChannel = MethodChannel('ma.heliantha.mobile/share');
+
+Future<void> _shareProduct(
+  BuildContext context,
+  Product product,
+  String price,
+) async {
+  final productUrl = AppConfig.productShareUrl(product.id);
+  final reference = product.reference?.trim();
+  final text = [
+    'Découvrez ce produit Heliantha :',
+    product.name.trim(),
+    if (reference != null && reference.isNotEmpty) 'Réf. $reference',
+    price,
+    productUrl,
+  ].join('\n');
+
+  try {
+    await _productShareChannel.invokeMethod<void>('shareText', {
+      'subject': '${product.name} - Heliantha',
+      'text': text,
+    });
+  } on PlatformException {
+    await Clipboard.setData(ClipboardData(text: productUrl));
+    if (context.mounted) {
+      AppFeedback.info(context, 'Lien produit copié');
+    }
+  } on MissingPluginException {
+    await Clipboard.setData(ClipboardData(text: productUrl));
+    if (context.mounted) {
+      AppFeedback.info(context, 'Lien produit copié');
+    }
+  }
+}
+
 class _ProductSummary extends StatelessWidget {
   const _ProductSummary({
     required this.name,
@@ -720,6 +757,7 @@ class _ProductSummary extends StatelessWidget {
     required this.isFavorite,
     required this.onToggleFavorite,
     required this.onAddToCart,
+    required this.onShare,
   });
 
   final String name;
@@ -729,6 +767,7 @@ class _ProductSummary extends StatelessWidget {
   final bool isFavorite;
   final VoidCallback onToggleFavorite;
   final VoidCallback onAddToCart;
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -793,6 +832,22 @@ class _ProductSummary extends StatelessWidget {
                   isFavorite ? Icons.favorite : Icons.favorite_border_rounded,
                 ),
                 label: Text(isFavorite ? 'Favori' : 'Ajouter aux favoris'),
+              ),
+              Tooltip(
+                message: 'Partager le produit',
+                child: SizedBox.square(
+                  dimension: 44,
+                  child: OutlinedButton(
+                    onPressed: onShare,
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                      ),
+                    ),
+                    child: const Icon(Icons.share_rounded, size: 20),
+                  ),
+                ),
               ),
             ],
           ),
