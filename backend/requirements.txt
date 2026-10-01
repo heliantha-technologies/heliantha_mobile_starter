@@ -7,3 +7,4 @@ PyJWT>=2.10,<3
 python-multipart>=0.0.20,<1
 email-validator>=2.2,<3
 firebase-admin>=6.6,<7
+redis>=5.2,<6

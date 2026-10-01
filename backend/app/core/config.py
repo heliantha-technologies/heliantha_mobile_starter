@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     firebase_project_id: str = ""
     google_application_credentials: str = ""
     notification_webhook_secret: str = ""
+    internal_cache_clear_token: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "INTERNAL_CACHE_CLEAR_TOKEN",
+            "CACHE_CLEAR_TOKEN",
+            "internal_cache_clear_token",
+            "cache_clear_token",
+        ),
+    )
 
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 

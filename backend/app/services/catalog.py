@@ -75,6 +75,13 @@ class CatalogService:
             settings,
         )
 
+    @classmethod
+    def clear_memory_caches(cls) -> None:
+        cls._category_rows_cache.clear()
+        cls._category_product_ids_cache.clear()
+        cls._products_cache.clear()
+        cls._product_detail_cache.clear()
+
     # ---------------------------------------------------------
     # CATEGORIES
     # ---------------------------------------------------------

@@ -7,9 +7,21 @@ from urllib.parse import urljoin
 import httpx
 
 from app.core.config import Settings
+from app.core.prestashop_cache import cache_key, get_json, set_json
 
 
 logger = logging.getLogger(__name__)
+
+CACHEABLE_GET_RESOURCES = {
+    "categories",
+    "currencies",
+    "languages",
+    "product_feature_values",
+    "product_features",
+    "products",
+    "search",
+    "stock_availables",
+}
 
 
 class PrestaShopError(RuntimeError):
@@ -47,6 +59,13 @@ class PrestaShopClient:
         if params:
             merged_params.update(params)
 
+        redis_cache_key: str | None = None
+        if method.upper() == "GET" and self._is_cacheable_get_resource(resource):
+            redis_cache_key = cache_key(resource, merged_params)
+            cached = get_json(redis_cache_key)
+            if cached is not None:
+                return cached
+
         client = self._shared_client()
         start = monotonic()
         response = await client.request(method, url, params=merged_params)
@@ -65,7 +84,10 @@ class PrestaShopClient:
                 "PrestaShop n'a pas renvoyé du JSON. "
                 "Vérifier output_format=JSON et la configuration Webservice."
             )
-        return response.json()
+        payload = response.json()
+        if redis_cache_key is not None:
+            set_json(redis_cache_key, payload)
+        return payload
 
     async def list_resource(
         self,
@@ -153,6 +175,10 @@ class PrestaShopClient:
     def reset_perf(self) -> None:
         self.prestashop_calls = 0
         self.prestashop_time_ms = 0.0
+
+    def _is_cacheable_get_resource(self, resource: str) -> bool:
+        root_resource = resource.lstrip("/").split("/", 1)[0]
+        return root_resource in CACHEABLE_GET_RESOURCES
 
     def _shared_client(self) -> httpx.AsyncClient:
         self._check_config()

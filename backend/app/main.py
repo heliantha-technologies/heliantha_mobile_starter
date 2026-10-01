@@ -11,6 +11,7 @@ from app.api.routes import (
     checkout,
     favorites,
     health,
+    internal,
     notifications,
     orders,
 )
@@ -70,6 +71,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(internal.router)
 app.include_router(addresses.router, prefix=settings.api_prefix)
 app.include_router(catalog.router, prefix=settings.api_prefix)
 app.include_router(checkout.router, prefix=settings.api_prefix)

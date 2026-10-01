@@ -1,7 +1,7 @@
 name: heliantha_mobile
 description: Application Android Heliantha connectée à PrestaShop via FastAPI.
 publish_to: "none"
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
