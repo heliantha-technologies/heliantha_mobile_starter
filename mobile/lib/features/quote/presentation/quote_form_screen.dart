@@ -1,10 +1,12 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_tokens.dart';
+import '../../../shared/widgets/app_background.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
@@ -178,7 +180,66 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         showBack: true,
         backFallbackLocation: '/quote',
       ),
-      body: _result == null ? _buildWizard(spec) : _buildResult(spec),
+      body: Stack(
+        children: [
+          // 1. Fond d'écran avec technicien solaire HeliAntha + texture satinée Apple
+          Positioned.fill(
+            child: Image.asset(
+              helianthaBackgroundAsset,
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.82),
+                    const Color(0xFFF8FAFC).withValues(alpha: 0.88),
+                    const Color(0xFFF1F5F9).withValues(alpha: 0.94),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Halos lumineux subtils (Aurora blur)
+          Positioned(
+            top: -40,
+            right: -30,
+            child: IgnorePointer(
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 100,
+            left: -40,
+            child: IgnorePointer(
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.10),
+                ),
+              ),
+            ),
+          ),
+          // 2. Contenu scrollable (Wizard ou Résultat)
+          Positioned.fill(
+            child: _result == null ? _buildWizard(spec) : _buildResult(spec),
+          ),
+        ],
+      ),
       bottomNavigationBar: _result == null
           ? _WizardBottomBar(
               currentStep: _currentStep,
@@ -250,24 +311,15 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _WizardHeader(
-                spec: spec,
-                currentStep: _totalSteps - 1,
-                totalSteps: _totalSteps,
-                onClose: _closeWizard,
-              ),
+              _ResultHeader(spec: spec, onClose: _closeWizard),
               const SizedBox(height: 16),
               _QuoteResultCard(
                 result: _result!,
                 kind: _kind,
+                selectedPumpCv: _existingPumpCv,
                 downloadingPdf: _downloadingPdf,
                 onDownloadPdf: _downloadPdf,
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _closeWizard,
-                icon: const Icon(Icons.grid_view_rounded),
-                label: const Text('Choisir un autre projet'),
+                onRestart: _restartEstimate,
               ),
             ],
           ),
@@ -277,20 +329,49 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   }
 
   Widget _buildStepCard() {
-    return AppSurface(
-      radius: 20,
-      shadow: true,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SectionTitle(
-            title: _stepTitle,
-            subtitle: _stepSubtitle,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
-          const SizedBox(height: 16),
-          _buildCurrentStepContent(),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.90),
+                width: 1.2,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SectionTitle(
+                  title: _stepTitle,
+                  subtitle: _stepSubtitle,
+                ),
+                const SizedBox(height: 18),
+                _buildCurrentStepContent(),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -318,7 +399,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
             icon: Icons.settings_input_component_outlined,
             onChanged: _setPumpExisting,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           _RadioCard<bool>(
             value: false,
             groupValue: _pumpExisting,
@@ -332,13 +413,58 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     }
 
     if (_currentStep == 1 && _pumpExisting == true) {
-      return _PumpPowerModalField(
-        options: _pumpPowerOptions,
-        selectedValue: _existingPumpCv,
-        onChanged: (value) => setState(() {
-          _existingPumpCv = value;
-          _result = null;
-        }),
+      // Grille de capsules tactiles élégantes (chips) 2 ou 3 colonnes pour les 10 puissances
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.speed_rounded,
+                color: Color(0xFFF59E0B),
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Puissance de la pompe (CV) :',
+                style: TextStyle(
+                  color: const Color(0xFF0F172A),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final crossAxisCount = constraints.maxWidth >= 400 ? 3 : 2;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _pumpPowerOptions.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  mainAxisExtent: 46,
+                ),
+                itemBuilder: (context, index) {
+                  final option = _pumpPowerOptions[index];
+                  final isSelected = option == _existingPumpCv;
+                  return _TactileChip(
+                    label: '${_formatCompactNumber(option)} CV',
+                    selected: isSelected,
+                    onTap: () => setState(() {
+                      _existingPumpCv = option;
+                      _result = null;
+                    }),
+                  );
+                },
+              );
+            },
+          ),
+        ],
       );
     }
 
@@ -354,7 +480,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
               fieldName: 'le débit souhaité',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _NumberField(
             controller: _hmtController,
             label: 'Profondeur / HMT (mètres)',
@@ -377,7 +503,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _ChoiceSelector<String>(
-            title: 'Compteur',
+            title: 'Type de compteur',
             value: _meterType,
             options: const [
               _ChoiceOption(
@@ -396,9 +522,9 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
               _result = null;
             }),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           _ChoiceSelector<String>(
-            title: 'Réseau',
+            title: 'Type de réseau',
             value: _phase,
             options: const [
               _ChoiceOption(
@@ -433,13 +559,38 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const InfoPill(
-            icon: Icons.battery_charging_full_rounded,
-            label: 'Stockage Lithium haute performance',
-            backgroundColor: AppColors.softLeaf,
-            foregroundColor: AppColors.leaf,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5).withValues(alpha: 0.90),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFA7F3D0),
+                width: 1.1,
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.battery_charging_full_rounded,
+                  color: Color(0xFF059669),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Stockage Lithium haute performance inclus',
+                    style: TextStyle(
+                      color: const Color(0xFF065F46),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           _buildEnergyFields(),
         ],
       );
@@ -457,7 +608,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
           icon: Icons.receipt_long_outlined,
           validator: _energyValidator,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         _NumberField(
           controller: _consumptionController,
           label: 'Consommation (kWh/mois)',
@@ -480,14 +631,12 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextFormField(
+        _InputField(
           controller: _nameController,
+          label: 'Nom complet',
+          icon: Icons.person_outline_rounded,
           textCapitalization: TextCapitalization.words,
           textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(
-            labelText: 'Nom complet',
-            prefixIcon: Icon(Icons.person_outline_rounded),
-          ),
           validator: (value) {
             final text = value?.trim() ?? '';
             if (text.length < 2) {
@@ -496,19 +645,17 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
             return null;
           },
         ),
-        const SizedBox(height: 12),
-        TextFormField(
+        const SizedBox(height: 14),
+        _InputField(
           controller: _phoneController,
+          label: 'Numéro de téléphone',
+          hintText: '06XXXXXXXX',
+          icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[0-9 +.-]')),
           ],
-          decoration: const InputDecoration(
-            labelText: 'Numéro de téléphone',
-            hintText: '06XXXXXXXX',
-            prefixIcon: Icon(Icons.phone_outlined),
-          ),
           validator: (value) {
             final phone = _compactPhone(value ?? '');
             if (!RegExp(r'^0[567]\d{8}$').hasMatch(phone)) {
@@ -517,15 +664,13 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
             return null;
           },
         ),
-        const SizedBox(height: 12),
-        TextFormField(
+        const SizedBox(height: 14),
+        _InputField(
           controller: _cityController,
+          label: 'Ville',
+          icon: Icons.location_city_outlined,
           textCapitalization: TextCapitalization.words,
           textInputAction: TextInputAction.done,
-          decoration: const InputDecoration(
-            labelText: 'Ville',
-            prefixIcon: Icon(Icons.location_city_outlined),
-          ),
           validator: (value) {
             if ((value ?? '').trim().isEmpty) {
               return 'Saisissez la ville.';
@@ -550,8 +695,8 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         }
         if (_currentStep == 1) {
           return _pumpExisting == true
-              ? 'Quelle est la puissance de votre pompe ?'
-              : 'Quels sont vos besoins en eau ?';
+              ? 'Puissance de votre pompe'
+              : 'Vos besoins en eau';
         }
         return 'Vos coordonnées';
       case _QuoteProjectKind.photovoltaic:
@@ -574,28 +719,28 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     switch (_kind) {
       case _QuoteProjectKind.pumping:
         if (_currentStep == 0) {
-          return 'Ce choix détermine les informations nécessaires au calcul.';
+          return 'Ce choix oriente les données requises pour le calcul.';
         }
         if (_currentStep == 1 && _pumpExisting == true) {
-          return 'Sélectionnez la puissance indiquée sur la pompe.';
+          return 'Sélectionnez la puissance indiquée sur la plaque pompe.';
         }
         if (_currentStep == 1) {
-          return 'Le débit et la HMT permettent de dimensionner la pompe.';
+          return 'Le débit et la HMT permettent un dimensionnement exact.';
         }
-        return 'Nous utilisons ces informations pour générer le devis.';
+        return 'Ces informations permettent de générer votre devis.';
       case _QuoteProjectKind.photovoltaic:
         if (_currentStep == 0) {
-          return 'Ces choix orientent le matériel adapté à votre installation.';
+          return 'Configurez votre type de compteur et d\'alimentation.';
         }
         if (_currentStep == 1) {
           return 'Renseignez la facture ou la consommation mensuelle.';
         }
-        return 'Nous utilisons ces informations pour générer le devis.';
+        return 'Ces informations permettent de générer votre devis.';
       case _QuoteProjectKind.hybrid:
         if (_currentStep == 0) {
           return 'Renseignez la facture ou la consommation mensuelle.';
         }
-        return 'Nous utilisons ces informations pour générer le devis.';
+        return 'Ces informations permettent de générer votre devis.';
     }
   }
 
@@ -642,6 +787,13 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     context.go('/quote');
   }
 
+  void _restartEstimate() {
+    setState(() {
+      _result = null;
+      _currentStep = 0;
+    });
+  }
+
   Future<void> _submit() async {
     if (_submitting) {
       return;
@@ -668,7 +820,8 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     );
 
     try {
-      final result = await ref.read(quoteRepositoryProvider).calculate(payload);
+      final result =
+          await ref.read(quoteRepositoryProvider).calculate(payload);
       if (!mounted) {
         return;
       }
@@ -794,7 +947,8 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   }
 
   static double? _parseNumber(String value) {
-    final normalized = value.trim().replaceAll(' ', '').replaceAll(',', '.');
+    final normalized =
+        value.trim().replaceAll(' ', '').replaceAll(',', '.');
     if (normalized.isEmpty) {
       return null;
     }
@@ -824,89 +978,170 @@ class _WizardHeader extends StatelessWidget {
     final progress = (currentStep + 1) / totalSteps;
     final percent = (progress * 100).round();
 
-    return AppSurface(
-      radius: 20,
-      shadow: true,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppIconBadge(
-                icon: spec.icon,
-                color: spec.accent,
-                backgroundColor: spec.soft,
-                size: 50,
-                iconSize: 26,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.90),
+                width: 1.2,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      spec.title.toUpperCase(),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w900,
-                          ),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFEF3C7),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        spec.icon,
+                        color: spec.accent,
+                        size: 24,
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      spec.subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.muted,
-                            fontWeight: FontWeight.w600,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            spec.title.toUpperCase(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: const Color(0xFF0F172A),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              letterSpacing: 0.4,
+                            ),
                           ),
+                          const SizedBox(height: 3),
+                          Text(
+                            spec.subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: const Color(0xFF475569),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Fermer',
+                      onPressed: onClose,
+                      style: IconButton.styleFrom(
+                        backgroundColor:
+                            const Color(0xFFF1F5F9).withValues(alpha: 0.8),
+                      ),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF0F172A),
+                        size: 19,
+                      ),
                     ),
                   ],
                 ),
-              ),
-              IconButton(
-                tooltip: 'Fermer',
-                onPressed: onClose,
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Étape ${currentStep + 1} sur $totalSteps',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: AppColors.slate,
-                        fontWeight: FontWeight.w900,
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    // Badge "Étape X sur Y" : capsule Bleu Nuit & Or
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
                       ),
-                ),
-              ),
-              Text(
-                '$percent %',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: AppColors.navy,
-                      fontWeight: FontWeight.w900,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color:
+                              const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.bolt_rounded,
+                            color: Color(0xFFF59E0B),
+                            size: 13,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Étape ${currentStep + 1} sur $totalSteps',
+                            style: const TextStyle(
+                              color: Color(0xFFF59E0B),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 9,
-              backgroundColor: AppColors.surfaceMuted,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.sun),
+                    const Spacer(),
+                    Text(
+                      '$percent %',
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Barre de progression dégradé Jaune Solaire HeliAntha (hauteur 4px, rayon 10px)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    height: 4,
+                    width: double.infinity,
+                    color: const Color(0xFFE2E8F0),
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: progress.clamp(0.0, 1.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFF59E0B), Color(0xFFFBBF24)],
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -931,53 +1166,139 @@ class _WizardBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      elevation: 10,
-      child: SafeArea(
-        top: false,
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: AppColors.border),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.88),
+            border: const Border(
+              top: BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
             ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: currentStep > 0
-                    ? OutlinedButton.icon(
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                children: [
+                  if (currentStep > 0) ...[
+                    _TactilePressScale(
+                      enabled: !submitting,
+                      child: OutlinedButton.icon(
                         onPressed: submitting ? null : onBack,
-                        icon: const Icon(Icons.arrow_back_rounded),
-                        label: const Text('Retour'),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: canContinue ? onNext : null,
-                  icon: submitting
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2.4),
-                        )
-                      : Icon(
-                          isLastStep
-                              ? Icons.calculate_outlined
-                              : Icons.arrow_forward_rounded,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(100, 56),
+                          backgroundColor:
+                              Colors.white.withValues(alpha: 0.85),
+                          foregroundColor: const Color(0xFF0F172A),
+                          side: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(22),
+                          ),
                         ),
-                  label: Text(
-                    submitting
-                        ? 'Calcul...'
-                        : isLastStep
-                            ? 'Calculer mon devis'
-                            : 'Suivant',
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
+                          size: 19,
+                        ),
+                        label: const Text(
+                          'Retour',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: _TactilePressScale(
+                      enabled: canContinue,
+                      child: Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          gradient: canContinue
+                              ? const LinearGradient(
+                                  colors: [
+                                    Color(0xFF0F172A),
+                                    Color(0xFF1E293B),
+                                  ],
+                                )
+                              : null,
+                          color: canContinue
+                              ? null
+                              : const Color(0xFFCBD5E1),
+                          boxShadow: canContinue
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFF0F172A)
+                                        .withValues(alpha: 0.35),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(22),
+                            onTap: canContinue ? onNext : null,
+                            child: Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (submitting) ...[
+                                    const SizedBox.square(
+                                      dimension: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.4,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Text(
+                                      'Calcul en cours...',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    Icon(
+                                      isLastStep
+                                          ? Icons.calculate_rounded
+                                          : Icons.arrow_forward_rounded,
+                                      color: const Color(0xFFF59E0B),
+                                      size: 21,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isLastStep
+                                          ? 'Calculer mon devis'
+                                          : 'Suivant',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -985,128 +1306,564 @@ class _WizardBottomBar extends StatelessWidget {
   }
 }
 
-class _QuoteResultCard extends StatelessWidget {
-  const _QuoteResultCard({
-    required this.result,
-    required this.kind,
-    required this.downloadingPdf,
-    required this.onDownloadPdf,
+class _ResultHeader extends StatelessWidget {
+  const _ResultHeader({
+    required this.spec,
+    required this.onClose,
   });
 
-  final QuoteCalculationResult result;
-  final _QuoteProjectKind kind;
-  final bool downloadingPdf;
-  final VoidCallback onDownloadPdf;
-
-  @override
-  Widget build(BuildContext context) {
-    final quoteNumber = result.quoteNumber;
-    return AppSurface(
-      radius: 20,
-      shadow: true,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const AppIconBadge(
-                icon: Icons.task_alt_rounded,
-                color: AppColors.leaf,
-                backgroundColor: AppColors.softLeaf,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Synthèse du devis',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.ink,
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _TotalPanel(total: result.totalTtc),
-          const SizedBox(height: 14),
-          _ResultLine(
-            label: 'Référence devis',
-            value: quoteNumber ?? 'Non communiquée',
-          ),
-          _ResultLine(
-            label: 'Puissance',
-            value: result.powerKwc == null
-                ? 'Non communiquée'
-                : '${_formatCompactNumber(result.powerKwc!)} kWc',
-          ),
-          _ResultLine(
-            label: 'Nombre de panneaux',
-            value: result.panelCount?.toString() ?? 'Non communiqué',
-          ),
-          _ResultLine(
-            label: kind == _QuoteProjectKind.pumping
-                ? 'Variateur sélectionné'
-                : 'Onduleur sélectionné',
-            value: result.inverter ?? 'Non communiqué',
-          ),
-          if (kind == _QuoteProjectKind.hybrid || result.batteryStorage != null)
-            _ResultLine(
-              label: 'Stockage batterie',
-              value: result.batteryStorage ?? 'Inclus selon dimensionnement',
-            ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed:
-                quoteNumber == null || downloadingPdf ? null : onDownloadPdf,
-            icon: downloadingPdf
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2.4),
-                  )
-                : const Icon(Icons.picture_as_pdf_outlined),
-            label: Text(
-              downloadingPdf
-                  ? 'Téléchargement...'
-                  : 'Télécharger mon Devis Officiel (PDF)',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TotalPanel extends StatelessWidget {
-  const _TotalPanel({required this.total});
-
-  final double? total;
+  final _QuoteFormSpec spec;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.navy,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.90),
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF3C7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    spec.icon,
+                    color: spec.accent,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Estimation Personnalisée',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: const Color(0xFF0F172A),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: const Color(0xFFA7F3D0),
+                              ),
+                            ),
+                            child: const Text(
+                              'Prêt',
+                              style: TextStyle(
+                                color: Color(0xFF059669),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              spec.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF475569),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Fermer',
+                  onPressed: onClose,
+                  style: IconButton.styleFrom(
+                    backgroundColor:
+                        const Color(0xFFF1F5F9).withValues(alpha: 0.8),
+                  ),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF0F172A),
+                    size: 19,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuoteResultCard extends StatefulWidget {
+  const _QuoteResultCard({
+    required this.result,
+    required this.kind,
+    required this.selectedPumpCv,
+    required this.downloadingPdf,
+    required this.onDownloadPdf,
+    required this.onRestart,
+  });
+
+  final QuoteCalculationResult result;
+  final _QuoteProjectKind kind;
+  final double? selectedPumpCv;
+  final bool downloadingPdf;
+  final VoidCallback onDownloadPdf;
+  final VoidCallback onRestart;
+
+  @override
+  State<_QuoteResultCard> createState() => _QuoteResultCardState();
+}
+
+class _QuoteResultCardState extends State<_QuoteResultCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _entryController;
+  late final Animation<double> _heroAnimation;
+  late final List<Animation<double>> _specificationAnimations;
+
+  @override
+  void initState() {
+    super.initState();
+    _entryController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
+    _heroAnimation = CurvedAnimation(
+      parent: _entryController,
+      curve: const Interval(0, 0.48, curve: Curves.easeOutCubic),
+    );
+    _specificationAnimations = List.generate(4, (index) {
+      final start = 0.20 + index * 0.18;
+      final end = (start + 0.34).clamp(0.0, 1.0);
+      return CurvedAnimation(
+        parent: _entryController,
+        curve: Interval(start, end, curve: Curves.easeOutCubic),
+      );
+    });
+    _entryController.forward();
+  }
+
+  @override
+  void dispose() {
+    _entryController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = widget.result;
+    final kind = widget.kind;
+    final quoteNumber = result.quoteNumber;
+    final power = result.powerKwc;
+    final panels = result.panelCount;
+    final deviceLabel = result.inverter ??
+        (kind == _QuoteProjectKind.pumping
+            ? _fallbackPumpDriveLabel(widget.selectedPumpCv)
+            : 'Onduleur inclus');
+    final fourthSpec = switch (kind) {
+      _QuoteProjectKind.hybrid => _ResultSpecification(
+          icon: Icons.battery_charging_full_rounded,
+          title: 'Stockage',
+          value: result.batteryStorage ?? 'Lithium dimensionné',
+          color: const Color(0xFF059669),
+        ),
+      _QuoteProjectKind.pumping => _ResultSpecification(
+          icon: Icons.water_drop_outlined,
+          title: 'Pompe',
+          value: widget.selectedPumpCv == null
+              ? 'Selon étude'
+              : '${_formatCompactNumber(widget.selectedPumpCv!)} CV',
+          color: const Color(0xFF0284C7),
+        ),
+      _QuoteProjectKind.photovoltaic => const _ResultSpecification(
+          icon: Icons.verified_user_outlined,
+          title: 'Particularité',
+          value: 'Démarches & pose incluses',
+          color: Color(0xFF059669),
+        ),
+    };
+    final specifications = <_ResultSpecification>[
+      _ResultSpecification(
+        icon: Icons.bolt_rounded,
+        title: 'Puissance solaire',
+        value:
+            power == null ? 'Selon étude' : '${power.toStringAsFixed(2)} kWc',
+        color: const Color(0xFFF59E0B),
+      ),
+      _ResultSpecification(
+        icon: Icons.solar_power_rounded,
+        title: 'Modules solaires',
+        value: panels == null ? 'Sur mesure' : '$panels panneaux',
+        color: const Color(0xFF0284C7),
+      ),
+      _ResultSpecification(
+        icon: kind == _QuoteProjectKind.pumping
+            ? Icons.settings_input_component_rounded
+            : Icons.sync_alt_rounded,
+        title: kind == _QuoteProjectKind.pumping ? 'Variateur' : 'Onduleur',
+        value: deviceLabel,
+        color: const Color(0xFF0284C7),
+      ),
+      fourthSpec,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AnimatedBuilder(
+          animation: _heroAnimation,
+          child: _TotalPanel(
+            total: result.totalTtc,
+            quoteNumber: quoteNumber,
+          ),
+          builder: (context, child) => FadeTransition(
+            opacity: _heroAnimation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.95, end: 1).animate(_heroAnimation),
+              child: child,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildSpecification(0, specifications[0])),
+            const SizedBox(width: 10),
+            Expanded(child: _buildSpecification(1, specifications[1])),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildSpecification(2, specifications[2])),
+            const SizedBox(width: 10),
+            Expanded(child: _buildSpecification(3, specifications[3])),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _TactilePressScale(
+          enabled: quoteNumber != null && !widget.downloadingPdf,
+          child: Container(
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.35),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: quoteNumber == null || widget.downloadingPdf
+                    ? null
+                    : widget.onDownloadPdf,
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.downloadingPdf) ...[
+                        const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Génération en cours...',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ] else ...[
+                        const Icon(
+                          Icons.picture_as_pdf_rounded,
+                          color: Color(0xFFF59E0B),
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Télécharger mon Devis Officiel (PDF)',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _TactilePressScale(
+          enabled: !widget.downloadingPdf,
+          child: TextButton.icon(
+            onPressed: widget.downloadingPdf ? null : widget.onRestart,
+            style: TextButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              foregroundColor: const Color(0xFF475569),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            icon: const Icon(Icons.replay_rounded, size: 19),
+            label: const Text(
+              'Refaire une estimation',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSpecification(int index, _ResultSpecification specification) {
+    final animation = _specificationAnimations[index];
+    return AnimatedBuilder(
+      animation: animation,
+      child: _SpecificationCapsule(specification: specification),
+      builder: (context, child) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.08),
+            end: Offset.zero,
+          ).animate(animation),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  static String _fallbackPumpDriveLabel(double? pumpCv) {
+    if (pumpCv == null) {
+      return 'Variateur solaire adapté';
+    }
+    return 'Variateur solaire ${_formatCompactNumber(pumpCv)} CV';
+  }
+}
+
+class _ResultSpecification {
+  const _ResultSpecification({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final Color color;
+}
+
+class _TotalPanel extends StatelessWidget {
+  const _TotalPanel({
+    required this.total,
+    required this.quoteNumber,
+  });
+
+  final double? total;
+  final String? quoteNumber;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+          width: 1.4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.32),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Montant Total TTC',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.72),
-                  fontWeight: FontWeight.w800,
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF059669).withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: const Color(0xFF34D399).withValues(alpha: 0.40),
+                  ),
                 ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: Color(0xFF34D399),
+                      size: 14,
+                    ),
+                    SizedBox(width: 5),
+                    Text(
+                      'Devis validé',
+                      style: TextStyle(
+                        color: Color(0xFFA7F3D0),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              if (quoteNumber != null)
+                Flexible(
+                  child: Text(
+                    quoteNumber!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 20),
           Text(
-            total == null ? 'Non communiqué' : '${_formatMoney(total!)} DH',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
+            'INVESTISSEMENT CLÉ EN MAIN',
+            style: TextStyle(
+              color: const Color(0xFFF59E0B),
+              fontWeight: FontWeight.w900,
+              fontSize: 11.5,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              alignment: Alignment.centerLeft,
+              fit: BoxFit.scaleDown,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    total == null ? 'Non communiqué' : _formatMoney(total!),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'DH TTC',
+                    style: TextStyle(
+                      color: Color(0xFFF59E0B),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Icon(
+                Icons.verified_rounded,
+                color: Color(0xFFF59E0B),
+                size: 16,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'Matériel garanti • Installation & démarches incluses',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11.5,
+                  ),
                 ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1114,43 +1871,118 @@ class _TotalPanel extends StatelessWidget {
   }
 }
 
-class _ResultLine extends StatelessWidget {
-  const _ResultLine({
-    required this.label,
-    required this.value,
-  });
+class _SpecificationCapsule extends StatelessWidget {
+  const _SpecificationCapsule({required this.specification});
 
-  final String label;
-  final String value;
+  final _ResultSpecification specification;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-            ),
+    final spec = specification;
+    return Container(
+      constraints: const BoxConstraints(minHeight: 136),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.90),
+                width: 1.2,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF3C7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    spec.icon,
+                    color: spec.color,
+                    size: 20,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  spec.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  spec.value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13.5,
+                    height: 1.15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TactilePressScale extends StatefulWidget {
+  const _TactilePressScale({
+    required this.enabled,
+    required this.child,
+  });
+
+  final bool enabled;
+  final Widget child;
+
+  @override
+  State<_TactilePressScale> createState() => _TactilePressScaleState();
+}
+
+class _TactilePressScaleState extends State<_TactilePressScale> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown:
+          widget.enabled ? (_) => setState(() => _pressed = true) : null,
+      onPointerUp:
+          widget.enabled ? (_) => setState(() => _pressed = false) : null,
+      onPointerCancel:
+          widget.enabled ? (_) => setState(() => _pressed = false) : null,
+      child: AnimatedScale(
+        scale: _pressed && widget.enabled ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 130),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
       ),
     );
   }
@@ -1176,39 +2008,107 @@ class _ChoiceSelector<T> extends StatelessWidget {
       children: [
         Text(
           title,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: AppColors.ink,
-                fontWeight: FontWeight.w900,
-              ),
+          style: const TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w900,
+            fontSize: 14.5,
+          ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        const SizedBox(height: 10),
+        Row(
           children: [
-            for (final option in options)
-              ChoiceChip(
-                selected: option.value == value,
-                avatar: Icon(option.icon, size: 18),
-                label: Text(option.label),
-                labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: option.value == value
-                          ? AppColors.navy
-                          : AppColors.slate,
-                      fontWeight: FontWeight.w900,
-                    ),
-                selectedColor: AppColors.softSun,
-                backgroundColor: AppColors.surfaceMuted,
-                side: BorderSide(
-                  color: option.value == value
-                      ? AppColors.premiumLine
-                      : AppColors.border,
+            for (var i = 0; i < options.length; i++) ...[
+              if (i > 0) const SizedBox(width: 10),
+              Expanded(
+                child: _ChoiceTile<T>(
+                  option: options[i],
+                  isSelected: options[i].value == value,
+                  onTap: () => onChanged(options[i].value),
                 ),
-                onSelected: (_) => onChanged(option.value),
               ),
+            ],
           ],
         ),
       ],
+    );
+  }
+}
+
+class _ChoiceTile<T> extends StatelessWidget {
+  const _ChoiceTile({
+    required this.option,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final _ChoiceOption<T> option;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TactilePressScale(
+      enabled: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? const Color(0xFFFFFBEB).withValues(alpha: 0.92)
+                  : Colors.white.withValues(alpha: 0.80),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isSelected
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFFE2E8F0),
+                width: isSelected ? 1.8 : 1.2,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                        blurRadius: 14,
+                        offset: const Offset(0, 5),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isSelected
+                      ? Icons.check_circle_rounded
+                      : option.icon,
+                  color: isSelected
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFF475569),
+                  size: 19,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    option.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isSelected
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFF334155),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1225,229 +2125,74 @@ class _ChoiceOption<T> {
   final IconData icon;
 }
 
-class _PumpPowerModalField extends StatelessWidget {
-  const _PumpPowerModalField({
-    required this.options,
-    required this.selectedValue,
-    required this.onChanged,
-  });
-
-  final List<double> options;
-  final double? selectedValue;
-  final ValueChanged<double> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final selectedLabel = selectedValue == null
-        ? 'Choisir une puissance'
-        : '${_formatCompactNumber(selectedValue!)} CV';
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => _openPicker(context),
-        child: Ink(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: selectedValue == null
-                ? AppColors.surfaceMuted
-                : AppColors.softSun,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selectedValue == null
-                  ? AppColors.border
-                  : AppColors.premiumLine,
-            ),
-          ),
-          child: Row(
-            children: [
-              AppIconBadge(
-                icon: Icons.speed_rounded,
-                size: 42,
-                iconSize: 22,
-                color: AppColors.blue,
-                backgroundColor: AppColors.softBlue,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      selectedLabel,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w900,
-                          ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Touchez pour choisir dans la liste des puissances.',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.muted,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.keyboard_arrow_up_rounded,
-                  color: AppColors.navy),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openPicker(BuildContext context) async {
-    final picked = await showModalBottomSheet<double>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: AppColors.surface,
-      builder: (sheetContext) {
-        return FractionallySizedBox(
-          heightFactor: 0.72,
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      const AppIconBadge(
-                        icon: Icons.speed_rounded,
-                        color: AppColors.blue,
-                        backgroundColor: AppColors.softBlue,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Puissance de la pompe',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(
-                                    color: AppColors.ink,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                            ),
-                            Text(
-                              'Sélectionnez la valeur en CV.',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: AppColors.muted,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final crossAxisCount =
-                            constraints.maxWidth >= 420 ? 3 : 2;
-                        return GridView.builder(
-                          padding: EdgeInsets.zero,
-                          itemCount: options.length,
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                            mainAxisExtent: 58,
-                          ),
-                          itemBuilder: (context, index) {
-                            final option = options[index];
-                            final selected = option == selectedValue;
-                            return _PumpPowerTile(
-                              value: option,
-                              selected: selected,
-                              onTap: () =>
-                                  Navigator.of(sheetContext).pop(option),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    if (picked != null) {
-      onChanged(picked);
-    }
-  }
-}
-
-class _PumpPowerTile extends StatelessWidget {
-  const _PumpPowerTile({
-    required this.value,
+class _TactileChip extends StatelessWidget {
+  const _TactileChip({
+    required this.label,
     required this.selected,
     required this.onTap,
   });
 
-  final double value;
+  final String label;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: selected ? AppColors.softSun : AppColors.surfaceMuted,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? AppColors.premiumLine : AppColors.border,
+    return _TactilePressScale(
+      enabled: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Ink(
+            decoration: BoxDecoration(
+              color: selected
+                  ? const Color(0xFF0F172A)
+                  : Colors.white.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFFE2E8F0),
+                width: selected ? 1.6 : 1.2,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
             ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                selected
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                color: selected ? AppColors.navy : AppColors.muted,
-                size: 19,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${_formatCompactNumber(value)} CV',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w900,
+            child: Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (selected) ...[
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      color: Color(0xFFF59E0B),
+                      size: 14,
                     ),
+                    const SizedBox(width: 5),
+                  ],
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: selected
+                          ? const Color(0xFFF59E0B)
+                          : const Color(0xFF0F172A),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1475,71 +2220,98 @@ class _RadioCard<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = value == groupValue;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => onChanged(value),
-        child: Ink(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.softSun : AppColors.surfaceMuted,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? AppColors.premiumLine : AppColors.border,
+    return _TactilePressScale(
+      enabled: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => onChanged(value),
+          child: Ink(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: selected
+                  ? const Color(0xFFFFFBEB).withValues(alpha: 0.92)
+                  : Colors.white.withValues(alpha: 0.80),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: selected
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFFE2E8F0),
+                width: selected ? 1.8 : 1.2,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
             ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: AppColors.navy.withValues(alpha: 0.08),
-                      blurRadius: 14,
-                      offset: const Offset(0, 7),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                selected
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                color: selected ? AppColors.navy : AppColors.muted,
-              ),
-              const SizedBox(width: 10),
-              AppIconBadge(
-                icon: icon,
-                size: 38,
-                iconSize: 20,
-                color: selected ? AppColors.navy : AppColors.blue,
-                backgroundColor:
-                    selected ? AppColors.surface : AppColors.softBlue,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w900,
-                          ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.muted,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ],
+            child: Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: selected
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFF94A3B8),
+                  size: 22,
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? const Color(0xFFFEF3C7)
+                        : const Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: selected
+                        ? const Color(0xFFD97706)
+                        : const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: const Color(0xFF0F172A),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFF475569),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1566,14 +2338,144 @@ class _NumberField extends StatelessWidget {
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       textInputAction: TextInputAction.next,
+      style: const TextStyle(
+        color: Color(0xFF0F172A),
+        fontWeight: FontWeight.w800,
+        fontSize: 14.5,
+      ),
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'[0-9., ]')),
       ],
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon),
+        labelStyle: const TextStyle(
+          color: Color(0xFF475569),
+          fontWeight: FontWeight.w600,
+        ),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.90),
+        prefixIcon: Icon(icon, color: const Color(0xFF0F172A), size: 21),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFE2E8F0),
+            width: 1.2,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFF59E0B),
+            width: 1.8,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFEF4444),
+            width: 1.2,
+          ),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFEF4444),
+            width: 1.8,
+          ),
+        ),
       ),
       validator: validator,
+    );
+  }
+}
+
+class _InputField extends StatelessWidget {
+  const _InputField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.hintText,
+    this.keyboardType,
+    this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
+    this.inputFormatters,
+    this.validator,
+    this.onFieldSubmitted,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final String? hintText;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
+  final List<TextInputFormatter>? inputFormatters;
+  final FormFieldValidator<String>? validator;
+  final ValueChanged<String>? onFieldSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      textCapitalization: textCapitalization,
+      inputFormatters: inputFormatters,
+      style: const TextStyle(
+        color: Color(0xFF0F172A),
+        fontWeight: FontWeight.w800,
+        fontSize: 14.5,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        labelStyle: const TextStyle(
+          color: Color(0xFF475569),
+          fontWeight: FontWeight.w600,
+        ),
+        hintStyle: const TextStyle(
+          color: Color(0xFF94A3B8),
+          fontWeight: FontWeight.w500,
+        ),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.90),
+        prefixIcon: Icon(icon, color: const Color(0xFF0F172A), size: 21),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFE2E8F0),
+            width: 1.2,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFF59E0B),
+            width: 1.8,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFEF4444),
+            width: 1.2,
+          ),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFEF4444),
+            width: 1.8,
+          ),
+        ),
+      ),
+      validator: validator,
+      onFieldSubmitted: onFieldSubmitted,
     );
   }
 }
@@ -1594,19 +2496,22 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Text(
           title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.ink,
-                fontWeight: FontWeight.w900,
-              ),
+          style: const TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
+            height: 1.15,
+          ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         Text(
           subtitle,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.muted,
-                fontWeight: FontWeight.w600,
-                height: 1.35,
-              ),
+          style: const TextStyle(
+            color: Color(0xFF475569),
+            fontWeight: FontWeight.w600,
+            fontSize: 12.5,
+            height: 1.3,
+          ),
         ),
       ],
     );
@@ -1622,7 +2527,6 @@ class _QuoteFormSpec {
     required this.subtitle,
     required this.icon,
     required this.accent,
-    required this.soft,
   });
 
   final String apiProjectType;
@@ -1630,7 +2534,6 @@ class _QuoteFormSpec {
   final String subtitle;
   final IconData icon;
   final Color accent;
-  final Color soft;
 
   factory _QuoteFormSpec.fromKind(_QuoteProjectKind kind) {
     switch (kind) {
@@ -1640,8 +2543,7 @@ class _QuoteFormSpec {
           title: 'Pompage solaire',
           subtitle: 'Forage, irrigation et alimentation en eau.',
           icon: Icons.water_drop_outlined,
-          accent: AppColors.blue,
-          soft: AppColors.softBlue,
+          accent: Color(0xFF0284C7),
         );
       case _QuoteProjectKind.hybrid:
         return const _QuoteFormSpec(
@@ -1649,8 +2551,7 @@ class _QuoteFormSpec {
           title: 'Solaire avec batteries',
           subtitle: 'Système 220V avec stockage sécurisé.',
           icon: Icons.battery_charging_full_rounded,
-          accent: AppColors.leaf,
-          soft: AppColors.softLeaf,
+          accent: Color(0xFF059669),
         );
       case _QuoteProjectKind.photovoltaic:
         return const _QuoteFormSpec(
@@ -1658,8 +2559,7 @@ class _QuoteFormSpec {
           title: 'Autoconsommation',
           subtitle: 'Réduisez votre facture avec le solaire.',
           icon: Icons.wb_sunny_outlined,
-          accent: AppColors.sun,
-          soft: AppColors.softSun,
+          accent: Color(0xFFD97706),
         );
     }
   }

@@ -180,14 +180,24 @@ class QuoteCalculationResult {
         'total',
       ]);
 
-  double? get powerKwc => _numberValue([
+  double? get powerKwc =>
+      _numberValue([
         'power_kwc',
         'puissance_kwc',
         'pv_power_kwc',
         'system_power_kwc',
         'installed_power_kwc',
         'puissance_pv_kwc',
-      ]);
+      ]) ??
+      _computedPowerFromPanels;
+
+  double? get _computedPowerFromPanels {
+    final panels = panelCount;
+    if (panels == null || panels <= 0) {
+      return null;
+    }
+    return double.parse((panels * 0.585).toStringAsFixed(2));
+  }
 
   int? get panelCount {
     final value = _numberValue([
@@ -198,20 +208,42 @@ class QuoteCalculationResult {
       'nombre_panneaux',
       'modules_count',
     ]);
-    return value?.round();
+    if (value != null) {
+      return value.round();
+    }
+    final panels = _lookup(['panels', 'solar_panels', 'modules', 'panneaux']);
+    if (panels is Iterable) {
+      return panels.length;
+    }
+    return null;
   }
 
-  String? get inverter => _stringValue([
+  String? get inverter =>
+      _stringValue([
         'inverter',
         'selected_inverter',
         'inverter_model',
         'onduleur',
+        'selected_onduleur',
         'variateur',
+        'selected_variateur',
+        'vfd',
+        'selected_vfd',
+        'vfd_model',
         'controller',
         'drive_model',
+      ]) ??
+      _titleByCategoryMarkers([
+        'inverter',
+        'inverters',
+        'onduleur',
+        'variateur',
+        'vfd',
+        'drive',
       ]);
 
-  String? get batteryStorage => _stringValue([
+  String? get batteryStorage =>
+      _stringValue([
         'battery_storage',
         'battery_capacity',
         'battery_capacity_kwh',
@@ -219,6 +251,13 @@ class QuoteCalculationResult {
         'storage_kwh',
         'batteries',
         'battery',
+      ]) ??
+      _titleByCategoryMarkers([
+        'battery',
+        'batteries',
+        'batterie',
+        'storage',
+        'stockage',
       ]);
 
   Object? _lookup(Iterable<String> keys) {
@@ -245,7 +284,9 @@ class QuoteCalculationResult {
     if (value == null) {
       return null;
     }
-    final text = value.toString().trim();
+    final text = value is num || value is bool
+        ? value.toString()
+        : parseDeviceTitle(value).trim();
     return text.isEmpty ? null : text;
   }
 
@@ -262,8 +303,67 @@ class QuoteCalculationResult {
     return null;
   }
 
+  String? _titleByCategoryMarkers(List<String> markers) {
+    final normalizedMarkers = markers.map(_normalizeKey).toList();
+    final queue = <Object?>[raw];
+    while (queue.isNotEmpty) {
+      final current = queue.removeAt(0);
+      if (current is Map) {
+        final category =
+            current['category'] ?? current['type'] ?? current['role'];
+        final normalizedCategory = _normalizeKey(category?.toString() ?? '');
+        if (normalizedCategory.isNotEmpty &&
+            normalizedMarkers
+                .any((marker) => normalizedCategory.contains(marker))) {
+          final title = parseDeviceTitle(current);
+          if (title != 'Inclus') {
+            return title;
+          }
+        }
+        queue.addAll(current.values);
+      } else if (current is Iterable) {
+        queue.addAll(current);
+      }
+    }
+    return null;
+  }
+
   static String _normalizeKey(String key) {
     return key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  static String parseDeviceTitle(Object? data) {
+    if (data is Map) {
+      for (final key in [
+        'title',
+        'summary',
+        'role',
+        'reference',
+        'name',
+        'model',
+        'label',
+      ]) {
+        final value = data[key];
+        if (value != null && value.toString().trim().isNotEmpty) {
+          return value.toString().trim();
+        }
+      }
+      return 'Inclus';
+    }
+    if (data is Iterable) {
+      for (final item in data) {
+        final title = parseDeviceTitle(item);
+        if (title != 'Inclus') {
+          return title;
+        }
+      }
+      return 'Inclus';
+    }
+    if (data is String) {
+      final text = data.trim();
+      return text.isEmpty ? 'Inclus' : text;
+    }
+    return 'Inclus';
   }
 }
 
