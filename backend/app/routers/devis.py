@@ -3,7 +3,7 @@ from typing import Any, Literal, Optional
 
 import httpx
 from fastapi import APIRouter, Body, HTTPException
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 router = APIRouter(
@@ -299,10 +299,10 @@ def _build_flask_payload(payload: QuoteRequest) -> dict[str, Any]:
     return normalized_payload
 
 
-@router.post("/calculer")
+@router.post("/calculer", response_model=None)
 async def calculer_devis(
     payload: QuoteRequest = Body(...),
-) -> dict[str, Any] | JSONResponse:
+) -> Any:
     normalized_payload = _build_flask_payload(payload)
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -324,9 +324,10 @@ async def calculer_devis(
         ) from exc
 
     if response.status_code != 200:
-        return JSONResponse(
+        content_type = response.headers.get("content-type", "").split(";")[0].lower()
+        raise HTTPException(
             status_code=response.status_code,
-            content=_upstream_error_detail(response),
+            detail=response.json() if content_type == "application/json" else response.text,
         )
 
     try:
