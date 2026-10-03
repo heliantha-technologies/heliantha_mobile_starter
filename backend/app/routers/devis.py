@@ -44,6 +44,10 @@ class PhotovoltaicInput(BaseModel):
         description="Consommation mensuelle en kWh.",
         examples=[420.0],
     )
+    network_type: Literal["monophase", "triphase"] = Field(
+        default="monophase",
+        description="Type de reseau attendu par le moteur Flask.",
+    )
     meter_type: Literal["monophase", "triphase"] = Field(
         default="monophase",
         description="Type de compteur.",
@@ -58,6 +62,7 @@ class PhotovoltaicInput(BaseModel):
         json_schema_extra={
             "example": {
                 "monthly_consumption_kwh": 420.0,
+                "network_type": "monophase",
                 "meter_type": "monophase",
                 "phase": "1",
             }
@@ -71,10 +76,29 @@ class HybridInput(BaseModel):
         description="Consommation mensuelle en kWh.",
         examples=[520.0],
     )
+    network_type: Literal["monophase", "triphase"] = Field(
+        default="monophase",
+        description="Type de reseau attendu par le moteur Flask.",
+    )
+    meter_type: Literal["monophase", "triphase"] = Field(
+        default="monophase",
+        description="Type de compteur.",
+    )
+    phase: Literal["1", "3"] = Field(
+        default="1",
+        description="Nombre de phases.",
+    )
 
     model_config = ConfigDict(
         extra="ignore",
-        json_schema_extra={"example": {"monthly_consumption_kwh": 520.0}},
+        json_schema_extra={
+            "example": {
+                "monthly_consumption_kwh": 520.0,
+                "network_type": "triphase",
+                "meter_type": "triphase",
+                "phase": "3",
+            }
+        },
     )
 
 
@@ -131,6 +155,7 @@ class QuoteRequest(BaseModel):
                     "project_type": "photovoltaic",
                     "data": {
                         "monthly_consumption_kwh": 420.0,
+                        "network_type": "monophase",
                         "meter_type": "monophase",
                         "phase": "1",
                     },
@@ -142,7 +167,12 @@ class QuoteRequest(BaseModel):
                 },
                 {
                     "project_type": "hybrid",
-                    "data": {"monthly_consumption_kwh": 520.0},
+                    "data": {
+                        "monthly_consumption_kwh": 520.0,
+                        "network_type": "triphase",
+                        "meter_type": "triphase",
+                        "phase": "3",
+                    },
                 },
                 {
                     "project_type": "pumping",
@@ -218,12 +248,36 @@ def _data_validation_error(project_type: str, exc: ValidationError) -> HTTPExcep
     )
 
 
-def _normalize_meter_data(data: dict[str, Any]) -> dict[str, Any]:
+def _normalize_network_value(value: Any) -> str:
+    if _is_missing(value):
+        return "monophase"
+    if not isinstance(value, str):
+        raise HTTPException(
+            status_code=400,
+            detail="Type de reseau invalide : network_type doit etre monophase ou triphase.",
+        )
+
+    normalized = value.strip().lower().replace("-", "").replace("_", "")
+    normalized = "".join(normalized.split())
+    if normalized not in {"monophase", "triphase"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Le type de reseau doit etre monophase ou triphase.",
+        )
+    return normalized
+
+
+def _normalize_network_data(data: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(data)
-    if not _is_missing(normalized.get("meter_type")):
-        normalized["meter_type"] = str(normalized["meter_type"]).strip().lower()
-    if not _is_missing(normalized.get("phase")):
-        normalized["phase"] = str(normalized["phase"]).strip()
+    network_source = normalized.get("network_type")
+    if _is_missing(network_source):
+        network_source = normalized.get("meter_type")
+    if _is_missing(network_source):
+        network_source = "monophase"
+    network_type = _normalize_network_value(network_source)
+    normalized["network_type"] = network_type
+    normalized["meter_type"] = network_type
+    normalized["phase"] = "3" if network_type == "triphase" else "1"
     return normalized
 
 
@@ -238,7 +292,7 @@ def _ensure_monthly_consumption(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_photovoltaic_data(data: dict[str, Any]) -> dict[str, Any]:
-    prepared = _normalize_meter_data(_ensure_monthly_consumption(data))
+    prepared = _normalize_network_data(_ensure_monthly_consumption(data))
     try:
         model = PhotovoltaicInput.model_validate(prepared)
     except ValidationError as exc:
@@ -247,7 +301,7 @@ def _normalize_photovoltaic_data(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_hybrid_data(data: dict[str, Any]) -> dict[str, Any]:
-    prepared = _ensure_monthly_consumption(data)
+    prepared = _normalize_network_data(_ensure_monthly_consumption(data))
     try:
         model = HybridInput.model_validate(prepared)
     except ValidationError as exc:
