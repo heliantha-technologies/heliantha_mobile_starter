@@ -382,47 +382,38 @@ async def calculer_devis(
 
 
 @router.get("/{quote_id}/pdf")
-async def telecharger_pdf_devis(quote_id: int) -> Response:
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{FLASK_INTERNAL_URL}/devis/{quote_id}/pdf",
-            )
-    except httpx.TimeoutException as exc:
-        logger.warning("Timeout du moteur solaire lors du PDF devis %s : %s", quote_id, exc)
-        raise HTTPException(
-            status_code=502,
-            detail="Le moteur solaire n'a pas renvoye le PDF dans le delai imparti.",
-        ) from exc
-    except httpx.RequestError as exc:
-        logger.warning("Erreur reseau vers le moteur solaire lors du PDF devis %s : %s", quote_id, exc)
-        raise HTTPException(
-            status_code=502,
-            detail="Impossible de joindre le moteur solaire pour recuperer le PDF.",
-        ) from exc
+async def telecharger_devis_pdf(quote_id: str) -> Response:
+    quote_id = quote_id.strip()
+    if not quote_id:
+        raise HTTPException(status_code=400, detail="Identifiant devis invalide.")
 
-    if response.status_code == 200:
-        return Response(
-            content=response.content,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'inline; filename="Devis_Heliantha_{quote_id}.pdf"',
-            },
-        )
+    if quote_id.isdigit():
+        flask_url = f"{FLASK_INTERNAL_URL}/devis/{quote_id}/document.pdf"
+    else:
+        flask_url = f"{FLASK_INTERNAL_URL}/simulation/{quote_id}/predevis"
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            response = await client.get(flask_url)
+    except Exception as exc:
+        logger.warning("Erreur connexion moteur PDF devis %s : %s", quote_id, exc)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erreur de connexion au moteur de devis: {exc}",
+        ) from exc
 
     if response.status_code == 404:
+        raise HTTPException(status_code=404, detail="Devis PDF introuvable.")
+
+    if response.status_code != 200:
         raise HTTPException(
-            status_code=404,
-            detail=f"Devis {quote_id} introuvable.",
+            status_code=response.status_code,
+            detail=f"Erreur moteur PDF: HTTP {response.status_code}",
         )
 
-    if response.status_code >= 400:
-        raise HTTPException(
-            status_code=_upstream_status_code(response.status_code),
-            detail=_upstream_error_detail(response),
-        )
-
-    raise HTTPException(
-        status_code=502,
-        detail=f"Reponse inattendue du moteur solaire : HTTP {response.status_code}.",
+    filename = f"Devis_HeliAntha_{quote_id}.pdf"
+    return Response(
+        content=response.content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"},
     )
