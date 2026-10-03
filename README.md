@@ -72,11 +72,11 @@ Un exemple de module/pont PrestaShop minimal est fourni dans `prestashop_bridge_
 Sous Windows PowerShell :
 
 ```powershell
-cd backend
+cd C:\Users\hp\Desktop\heliantha_mobile_starter\backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-Copy-Item .env.example .env
+python -m pip install -r requirements.txt
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
 Modifier `.env` :
@@ -90,13 +90,19 @@ JWT_SECRET=CHANGE_ME_WITH_A_LONG_RANDOM_SECRET
 Puis :
 
 ```powershell
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8011
 ```
 
 Ouvrir :
 
 ```text
-http://127.0.0.1:8000/docs
+http://127.0.0.1:8011/docs
+```
+
+Pour le module Devis, le moteur Flask doit aussi tourner en local sur :
+
+```text
+http://127.0.0.1:8012
 ```
 
 ---
@@ -106,24 +112,27 @@ http://127.0.0.1:8000/docs
 Flutter doit être installé sur le PC.
 
 ```powershell
-cd mobile
-flutter create .
-flutter pub get
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
+cd C:\Users\hp\Desktop\heliantha_mobile_starter\mobile
+C:\Users\hp\Desktop\flutter\bin\flutter.bat pub get
+C:\Users\hp\Desktop\flutter\bin\flutter.bat run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://127.0.0.1:8011
 ```
 
-`10.0.2.2` correspond au PC hôte depuis l'émulateur Android.
+Pour un émulateur Android, `10.0.2.2` correspond au PC hôte :
+
+```powershell
+C:\Users\hp\Desktop\flutter\bin\flutter.bat run --dart-define=API_BASE_URL=http://10.0.2.2:8011
+```
 
 Sur un vrai téléphone Android connecté au même Wi-Fi, utiliser l'IP locale du PC :
 
 ```powershell
-flutter run --dart-define=API_BASE_URL=http://192.168.X.X:8000
+C:\Users\hp\Desktop\flutter\bin\flutter.bat run --dart-define=API_BASE_URL=http://192.168.X.X:8011
 ```
 
 et lancer FastAPI sur toutes les interfaces :
 
 ```powershell
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload
 ```
 
 ---
@@ -338,7 +347,7 @@ Très important : publier Flutter sur Play Store **ne publie pas ton backend Fas
 Aujourd’hui tu utilises :
 
 ```text
-http://127.0.0.1:8000
+http://127.0.0.1:8011
 ```
 
 Ça fonctionne uniquement sur ton PC.
@@ -390,37 +399,51 @@ Donc tu n’as **rien besoin de payer ou publier maintenant**. On peut continuer
 [2]: https://support.google.com/googleplay/android-developer/answer/6112435?hl=fr&utm_source=chatgpt.com "Premiers pas avec la Play Console - Aide Console Play"
 [3]: https://support.google.com/googleplay/android-developer/answer/14151465?hl=FR&utm_source=chatgpt.com "Exigences de test d'applications pour les nouveaux comptes de développeur personnels - Aide Console Play"
 
+## Commandes rapides - systeme actuel Windows
 
+### 1. Analyser Flutter
 
-
-
-
-
-
-
-
-
-
+```powershell
+cd C:\Users\hp\Desktop\heliantha_mobile_starter
 C:\Users\hp\Desktop\flutter\bin\flutter.bat analyze
+```
 
+### 2. Demarrer le backend FastAPI mobile
 
+```powershell
 cd C:\Users\hp\Desktop\heliantha_mobile_starter\backend
-C:\Users\hp\Desktop\heliantha_mobile_starter\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --port 8000
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8011
 
+Swagger :
 
+```text
+http://127.0.0.1:8011/docs
+```
 
+Important pour les devis : le moteur Flask doit tourner separement sur `http://127.0.0.1:8012`.
 
+### 3. Demarrer Flutter sur Chrome
 
+Ouvrir un deuxieme terminal PowerShell :
+
+```powershell
 cd C:\Users\hp\Desktop\heliantha_mobile_starter\mobile
-C:\Users\hp\Desktop\flutter\bin\flutter.bat run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://127.0.0.1:8000
+C:\Users\hp\Desktop\flutter\bin\flutter.bat run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://127.0.0.1:8011
+```
 
+URL Chrome :
 
+```text
+http://localhost:3000
+```
 
+### 4. Refaire le ZIP du pont PrestaShop si besoin
 
-
-
+```powershell
 cd C:\Users\hp\Desktop\heliantha_mobile_starter\prestashop_bridge_example
-del helianthamobilebridge.zip
+if (Test-Path helianthamobilebridge.zip) { Remove-Item helianthamobilebridge.zip }
 tar -a -c -f helianthamobilebridge.zip helianthamobilebridge
 tar -tf helianthamobilebridge.zip
+```

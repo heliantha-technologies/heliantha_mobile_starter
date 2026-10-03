@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/account/presentation/account_screen.dart';
@@ -15,7 +14,8 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/legal/presentation/privacy_policy_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/orders/presentation/orders_screen.dart';
-import '../../features/cart/providers/cart_provider.dart';
+import '../../features/quote/presentation/quote_form_screen.dart';
+import '../../features/quote/presentation/quote_project_selector_screen.dart';
 import '../../shared/models/order.dart';
 import '../../features/product/presentation/product_screen.dart';
 import '../../shared/models/product.dart';
@@ -30,11 +30,11 @@ final _homeNavigatorKey = GlobalKey<NavigatorState>(
 final _catalogNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'catalogBranch',
 );
+final _quoteNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'quoteBranch',
+);
 final _favoritesNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'favoritesBranch',
-);
-final _cartNavigatorKey = GlobalKey<NavigatorState>(
-  debugLabel: 'cartBranch',
 );
 final _accountNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'accountBranch',
@@ -73,20 +73,28 @@ final appRouter = GoRouter(
           ],
         ),
         StatefulShellBranch(
+          navigatorKey: _quoteNavigatorKey,
+          routes: [
+            GoRoute(
+              path: '/quote',
+              builder: (_, __) => const QuoteProjectSelectorScreen(),
+              routes: [
+                GoRoute(
+                  path: 'form/:projectType',
+                  builder: (_, state) => QuoteFormScreen(
+                    projectType: state.pathParameters['projectType']!,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        StatefulShellBranch(
           navigatorKey: _favoritesNavigatorKey,
           routes: [
             GoRoute(
               path: '/favorites',
               builder: (_, __) => const FavoritesScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          navigatorKey: _cartNavigatorKey,
-          routes: [
-            GoRoute(
-              path: '/cart',
-              builder: (_, __) => const CartScreen(),
             ),
           ],
         ),
@@ -100,6 +108,11 @@ final appRouter = GoRouter(
           ],
         ),
       ],
+    ),
+    GoRoute(
+      path: '/cart',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (_, __) => const CartScreen(),
     ),
     GoRoute(
       path: '/products/:id',
@@ -172,18 +185,13 @@ final appRouter = GoRouter(
   ],
 );
 
-class _Shell extends ConsumerWidget {
+class _Shell extends StatelessWidget {
   const _Shell({required this.shell});
 
   final StatefulNavigationShell shell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cartCount = ref.watch(
-      cartProvider.select(
-        (items) => items.fold<int>(0, (sum, item) => sum + item.quantity),
-      ),
-    );
+  Widget build(BuildContext context) {
     return Scaffold(
       extendBody: false,
       resizeToAvoidBottomInset: false,
@@ -226,14 +234,14 @@ class _Shell extends ConsumerWidget {
                   label: 'Catalogue',
                 ),
                 const NavigationDestination(
+                  icon: _QuoteNavIcon(selected: false),
+                  selectedIcon: _QuoteNavIcon(selected: true),
+                  label: 'Devis',
+                ),
+                const NavigationDestination(
                   icon: Icon(Icons.favorite_border_rounded),
                   selectedIcon: Icon(Icons.favorite_rounded),
                   label: 'Favoris',
-                ),
-                NavigationDestination(
-                  icon: _CartNavIcon(count: cartCount, selected: false),
-                  selectedIcon: _CartNavIcon(count: cartCount, selected: true),
-                  label: 'Panier',
                 ),
                 const NavigationDestination(
                   icon: Icon(Icons.person_outline_rounded),
@@ -249,23 +257,35 @@ class _Shell extends ConsumerWidget {
   }
 }
 
-class _CartNavIcon extends StatelessWidget {
-  const _CartNavIcon({
-    required this.count,
-    required this.selected,
-  });
+class _QuoteNavIcon extends StatelessWidget {
+  const _QuoteNavIcon({required this.selected});
 
-  final int count;
   final bool selected;
 
   @override
   Widget build(BuildContext context) {
-    return Badge(
-      isLabelVisible: count > 0,
-      backgroundColor: AppColors.danger,
-      label: Text(count > 9 ? '9+' : '$count'),
+    return Container(
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected ? AppColors.sun : AppColors.navy,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: selected ? AppColors.premiumLine : AppColors.navy,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.navy.withValues(alpha: selected ? 0.16 : 0.10),
+            blurRadius: selected ? 14 : 10,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
       child: Icon(
-        selected ? Icons.shopping_cart_rounded : Icons.shopping_cart_outlined,
+        selected ? Icons.solar_power_rounded : Icons.calculate_outlined,
+        color: selected ? AppColors.navy : Colors.white,
+        size: 22,
       ),
     );
   }
