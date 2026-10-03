@@ -1,11 +1,10 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/widgets/app_background.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/brand_widgets.dart';
+import '../../assistant/presentation/widgets/ai_floating_orb.dart';
 
 class QuoteProjectSelectorScreen extends StatelessWidget {
   const QuoteProjectSelectorScreen({super.key});
@@ -15,8 +14,7 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
       title: 'Pompage solaire',
       description: 'Forage, irrigation, eau.',
       buttonLabel: 'Estimer mon pompage',
-      icon: Icons.water_drop_outlined,
-      accent: Color(0xFF0284C7),
+      emoji: '💧',
       projectType: 'pompage',
       enabled: true,
     ),
@@ -24,9 +22,8 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
       title: 'Site sans réseau',
       tag: 'Off-Grid',
       description: 'Produisez et stockez votre énergie.',
-      buttonLabel: 'Bientôt disponible',
-      icon: Icons.cottage_outlined,
-      accent: Color(0xFF0EA5E9),
+      buttonLabel: 'Bientot disponible',
+      emoji: '🏠',
       enabled: false,
     ),
     _QuoteProject(
@@ -34,8 +31,7 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
       tag: 'Photovoltaïque',
       description: 'Réduisez votre facture avec le solaire.',
       buttonLabel: 'Estimer mes économies',
-      icon: Icons.wb_sunny_outlined,
-      accent: Color(0xFFD97706),
+      emoji: '☀️',
       projectType: 'autoconsommation',
       enabled: true,
     ),
@@ -44,25 +40,22 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
       tag: 'Hybride',
       description: 'Solaire et stockage, en continuité.',
       buttonLabel: 'Estimer mon installation',
-      icon: Icons.battery_charging_full_rounded,
-      accent: Color(0xFF059669),
+      emoji: '🔋',
       projectType: 'hybride',
       enabled: true,
     ),
     _QuoteProject(
       title: 'Chauffage solaire',
       description: 'Eau chaude solaire.',
-      buttonLabel: 'Bientôt disponible',
-      icon: Icons.local_fire_department_outlined,
-      accent: Color(0xFFDC2626),
+      buttonLabel: 'Bientot disponible',
+      emoji: '♨️',
       enabled: false,
     ),
     _QuoteProject(
       title: 'Recharge électrique',
       description: 'Une borne adaptée à votre véhicule.',
-      buttonLabel: 'Bientôt disponible',
-      icon: Icons.ev_station_outlined,
-      accent: Color(0xFF475569),
+      buttonLabel: 'Bientot disponible',
+      emoji: '🚗',
       enabled: false,
     ),
   ];
@@ -72,11 +65,10 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
     return Scaffold(
       appBar: const AppTopBar(
         subtitle: 'Étude • Installation • Maintenance',
-        actions: [_QuoteMenuButton()],
       ),
       body: Stack(
         children: [
-          // 1. Fond d'écran avec technicien solaire HeliAntha + canevas satiné iOS
+          // Fond d'écran avec panneaux solaires & ciel subtil
           Positioned.fill(
             child: Image.asset(
               helianthaBackgroundAsset,
@@ -91,44 +83,15 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.white.withValues(alpha: 0.82),
-                    const Color(0xFFF8FAFC).withValues(alpha: 0.88),
-                    const Color(0xFFF1F5F9).withValues(alpha: 0.94),
+                    const Color(0xFFD6E8F6).withValues(alpha: 0.88),
+                    const Color(0xFFE8F2FA).withValues(alpha: 0.90),
+                    const Color(0xFFF1F6FB).withValues(alpha: 0.94),
                   ],
                 ),
               ),
             ),
           ),
-          // Halos lumineux subtils (Aurora blur)
-          Positioned(
-            top: -50,
-            right: -40,
-            child: IgnorePointer(
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.14),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 60,
-            left: -40,
-            child: IgnorePointer(
-              child: Container(
-                width: 180,
-                height: 180,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF38BDF8).withValues(alpha: 0.12),
-                ),
-              ),
-            ),
-          ),
-          // 2. Contenu en surfaces de verre dépoli
+          // Grille des cartes
           Positioned.fill(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -136,13 +99,13 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
                 final veryShortHeight = constraints.maxHeight < 540;
                 final horizontal = constraints.maxWidth >= 720 ? 24.0 : 12.0;
                 final vertical = veryShortHeight ? 8.0 : 10.0;
-                final gap = veryShortHeight ? 8.0 : 11.0;
+                final gap = veryShortHeight ? 8.0 : 12.0;
                 final heroHeight =
-                    veryShortHeight ? 56.0 : (shortHeight ? 68.0 : 80.0);
+                    veryShortHeight ? 56.0 : (shortHeight ? 66.0 : 78.0);
                 final gridHeight =
                     constraints.maxHeight - (vertical * 2) - heroHeight - gap;
                 final cardHeight =
-                    ((gridHeight - (gap * 2)) / 3).clamp(78.0, 185.0);
+                    ((gridHeight - (gap * 2)) / 3).clamp(90.0, 195.0);
 
                 return Padding(
                   padding: EdgeInsets.fromLTRB(
@@ -182,6 +145,13 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
               },
             ),
           ),
+          // Orbe IA flottant déplaçable avec clignotement de présence
+          const Positioned.fill(
+            child: AiFloatingOrb(
+              contextPrompt:
+                  'Le client consulte la sélection des projets solaires Heliantha Maroc (Pompage solaire, Autoconsommation photovoltaïque, Système solaire hybride avec batteries). Aide-le à choisir la solution solaire adaptée à ses besoins énergétiques.',
+            ),
+          ),
         ],
       ),
     );
@@ -217,83 +187,62 @@ class _QuoteHero extends StatelessWidget {
       height: height,
       width: double.infinity,
       decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.07),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: const Color(0xFF0F2537).withValues(alpha: 0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: Container(
-            width: double.infinity,
-            height: double.infinity,
-            padding: EdgeInsets.symmetric(
-              horizontal: dense ? 12 : 14,
-              vertical: dense ? 8 : 10,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: dense ? 12 : 14,
+          vertical: dense ? 8 : 10,
+        ),
+        child: Row(
+          children: [
+            HelianthaLogo(
+              size: dense ? 36 : 42,
+              padding: 3,
+              showShadow: true,
             ),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.9),
-                width: 1.2,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Quel est votre projet ?',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: const Color(0xFF102638),
+                          fontWeight: FontWeight.w800,
+                          height: 1.05,
+                          fontSize: dense ? 16 : 18,
+                        ),
+                  ),
+                  if (!dense) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      'Choisissez votre solution solaire.',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF5A7184),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11.5,
+                          ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            child: Row(
-              children: [
-                HelianthaLogo(
-                  size: dense ? 36 : 42,
-                  padding: 3,
-                  showShadow: true,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Quel est votre projet ?',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: const Color(0xFF0F172A),
-                              fontWeight: FontWeight.w900,
-                              height: 1.05,
-                              fontSize: dense ? 16 : 18,
-                            ),
-                      ),
-                      if (!dense) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          'Étude & dimensionnement solaire immédiat.',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: const Color(0xFF475569),
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 11.5,
-                                  ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
         ),
       ),
     );
@@ -322,27 +271,28 @@ class _ProjectCardState extends State<_ProjectCard> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final ultra = constraints.maxHeight < 96;
-        final tiny = constraints.maxHeight < 126;
-        final compact = constraints.maxHeight < 152;
-        final padding = ultra ? 6.0 : (tiny ? 8.0 : (compact ? 9.0 : 12.0));
-        final iconBox = ultra ? 26.0 : (tiny ? 32.0 : (compact ? 36.0 : 40.0));
-        final iconSize = ultra ? 16.0 : (tiny ? 18.0 : (compact ? 20.0 : 22.0));
+        final ultra = constraints.maxHeight < 100;
+        final tiny = constraints.maxHeight < 130;
+        final compact = constraints.maxHeight < 155;
+        final padding = ultra ? 6.0 : (tiny ? 8.0 : (compact ? 10.0 : 13.0));
+        final iconBoxSize = ultra ? 26.0 : (tiny ? 30.0 : (compact ? 34.0 : 38.0));
+        final emojiSize = ultra ? 14.0 : (tiny ? 16.0 : (compact ? 18.0 : 20.0));
         final buttonHeight = tiny ? 30.0 : (compact ? 34.0 : 38.0);
-        final hideDescription = constraints.maxHeight < 126;
+        final hideDescription = constraints.maxHeight < 128;
 
         return AnimatedScale(
-          scale: _pressed && project.enabled ? 0.96 : 1.0,
-          duration: const Duration(milliseconds: 140),
+          scale: _pressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 130),
           curve: Curves.easeOutCubic,
           child: Container(
             decoration: BoxDecoration(
+              color: Colors.white,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.08),
-                  blurRadius: 24,
-                  offset: const Offset(0, 10),
+                  color: const Color(0xFF0F2537).withValues(alpha: 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
                 ),
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.02),
@@ -351,173 +301,113 @@ class _ProjectCardState extends State<_ProjectCard> {
                 ),
               ],
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(24),
-                    onTap: widget.onTap,
-                    onTapDown: (_) => setState(() => _pressed = true),
-                    onTapUp: (_) => setState(() => _pressed = false),
-                    onTapCancel: () => setState(() => _pressed = false),
-                    child: Ink(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(
-                          alpha: project.enabled ? 0.85 : 0.70,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(24),
+                onTap: widget.onTap,
+                onTapDown: (_) => setState(() => _pressed = true),
+                onTapUp: (_) => setState(() => _pressed = false),
+                onTapCancel: () => setState(() => _pressed = false),
+                child: Padding(
+                  padding: EdgeInsets.all(padding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Badge icône squircle pastel avec l'émoji exact
+                      Container(
+                        width: iconBoxSize,
+                        height: iconBoxSize,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F5FA),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.90),
-                          width: 1.2,
+                        alignment: Alignment.center,
+                        child: Text(
+                          project.emoji,
+                          style: TextStyle(fontSize: emojiSize),
                         ),
                       ),
-                      child: Padding(
-                        padding: EdgeInsets.all(padding),
+                      SizedBox(height: ultra ? 3 : (tiny ? 5 : 8)),
+                      // Section Textes (Titre + Tag éventuel + Description)
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: ultra
+                              ? MainAxisAlignment.center
+                              : MainAxisAlignment.start,
                           children: [
-                            // En-tête de la carte : Badge icône & Tag éventuel
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: iconBox,
-                                  height: iconBox,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFFEF3C7),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    project.icon,
-                                    color: project.accent,
-                                    size: iconSize,
-                                  ),
-                                ),
-                                if (project.tag != null) ...[
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Align(
-                                      alignment: Alignment.topRight,
-                                      child: _ProjectTag(
-                                        label: project.tag!,
-                                        dense: compact,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            SizedBox(height: ultra ? 3 : (tiny ? 5 : 8)),
-                            // Contenu central : Titre en Bleu Nuit intense + descriptif
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: ultra
-                                    ? MainAxisAlignment.center
-                                    : MainAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    project.title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: const Color(0xFF0F172A),
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: tiny ? 13.0 : 15.0,
-                                      height: 1.12,
-                                    ),
-                                  ),
-                                  if (!hideDescription) ...[
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      project.description,
-                                      maxLines: compact ? 1 : 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: const Color(0xFF475569),
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: compact ? 10.5 : 11.5,
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                            Text(
+                              project.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: const Color(0xFF162D42),
+                                fontWeight: FontWeight.w800,
+                                fontSize: tiny ? 13.0 : 15.0,
+                                height: 1.15,
                               ),
                             ),
-                            // Bouton d'action capsule squircle
-                            if (!ultra)
-                              Container(
-                                width: double.infinity,
-                                height: buttonHeight,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  gradient: project.enabled
-                                      ? const LinearGradient(
-                                          colors: [
-                                            Color(0xFF0F172A),
-                                            Color(0xFF1E293B),
-                                          ],
-                                        )
-                                      : null,
-                                  color: project.enabled
-                                      ? null
-                                      : const Color(0xFFF1F5F9)
-                                          .withValues(alpha: 0.9),
-                                  boxShadow: project.enabled
-                                      ? [
-                                          BoxShadow(
-                                            color: const Color(0xFF0F172A)
-                                                .withValues(alpha: 0.22),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ]
-                                      : null,
-                                ),
-                                child: Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            project.buttonLabel,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: project.enabled
-                                                  ? Colors.white
-                                                  : const Color(0xFF94A3B8),
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: compact ? 10.5 : 11.5,
-                                            ),
-                                          ),
-                                        ),
-                                        if (project.enabled) ...[
-                                          const SizedBox(width: 4),
-                                          const Icon(
-                                            Icons.arrow_forward_rounded,
-                                            color: Color(0xFFF59E0B),
-                                            size: 13,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
+                            if (project.tag != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                project.tag!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: const Color(0xFF2B4D66),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: compact ? 10.5 : 11.5,
                                 ),
                               ),
+                            ],
+                            if (!hideDescription) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                project.description,
+                                maxLines: compact ? 1 : 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: const Color(0xFF5A7184),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: compact ? 10.5 : 11.5,
+                                  height: 1.2,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                    ),
+                      // Bouton d'action capsule en Bleu Pétrole Nuit
+                      if (!ultra)
+                        Container(
+                          width: double.infinity,
+                          height: buttonHeight,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF223E56),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  project.buttonLabel,
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11.8,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -529,162 +419,12 @@ class _ProjectCardState extends State<_ProjectCard> {
   }
 }
 
-class _ProjectTag extends StatelessWidget {
-  const _ProjectTag({
-    required this.label,
-    required this.dense,
-  });
-
-  final String label;
-  final bool dense;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: dense ? 6 : 8,
-        vertical: dense ? 3 : 4,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF3C7),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: const Color(0xFFFDE68A),
-          width: 0.9,
-        ),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: const Color(0xFF92400E),
-          fontWeight: FontWeight.w900,
-          fontSize: dense ? 9.0 : 10.0,
-        ),
-      ),
-    );
-  }
-}
-
-class _QuoteMenuButton extends StatelessWidget {
-  const _QuoteMenuButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: 'Menu',
-      onPressed: () => _showMenu(context),
-      icon: const Icon(Icons.menu_rounded),
-    );
-  }
-
-  static void _showMenu(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: Colors.white.withValues(alpha: 0.95),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _MenuDestination(
-                  icon: Icons.home_outlined,
-                  label: 'Accueil',
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.go('/');
-                  },
-                ),
-                _MenuDestination(
-                  icon: Icons.grid_view_rounded,
-                  label: 'Catalogue',
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.go('/catalog');
-                  },
-                ),
-                _MenuDestination(
-                  icon: Icons.favorite_border_rounded,
-                  label: 'Favoris',
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.go('/favorites');
-                  },
-                ),
-                _MenuDestination(
-                  icon: Icons.person_outline_rounded,
-                  label: 'Compte',
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.go('/account');
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MenuDestination extends StatelessWidget {
-  const _MenuDestination({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        width: 38,
-        height: 38,
-        decoration: const BoxDecoration(
-          color: Color(0xFFFEF3C7),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          color: const Color(0xFFD97706),
-          size: 20,
-        ),
-      ),
-      title: Text(
-        label,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: const Color(0xFF0F172A),
-              fontWeight: FontWeight.w900,
-            ),
-      ),
-      trailing: const Icon(
-        Icons.chevron_right_rounded,
-        color: Color(0xFF94A3B8),
-      ),
-      onTap: onTap,
-    );
-  }
-}
-
 class _QuoteProject {
   const _QuoteProject({
     required this.title,
     required this.description,
     required this.buttonLabel,
-    required this.icon,
-    required this.accent,
+    required this.emoji,
     required this.enabled,
     this.tag,
     this.projectType,
@@ -694,8 +434,8 @@ class _QuoteProject {
   final String? tag;
   final String description;
   final String buttonLabel;
-  final IconData icon;
-  final Color accent;
+  final String emoji;
   final bool enabled;
   final String? projectType;
 }
+

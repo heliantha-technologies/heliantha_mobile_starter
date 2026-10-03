@@ -10,6 +10,7 @@ import '../../../shared/widgets/app_background.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
+import '../../assistant/presentation/widgets/ai_floating_orb.dart';
 import '../data/quote_repository.dart';
 import '../providers/quote_provider.dart';
 
@@ -29,7 +30,6 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _flowController = TextEditingController();
   final _hmtController = TextEditingController();
-  final _monthlyBillController = TextEditingController();
   final _consumptionController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -119,8 +119,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   }
 
   bool get _isEnergyComplete {
-    return _isPositive(_monthlyBillController.text) ||
-        _isPositive(_consumptionController.text);
+    return _isPositive(_consumptionController.text);
   }
 
   bool get _isContactComplete {
@@ -138,7 +137,6 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     for (final controller in [
       _flowController,
       _hmtController,
-      _monthlyBillController,
       _consumptionController,
       _nameController,
       _phoneController,
@@ -153,7 +151,6 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     for (final controller in [
       _flowController,
       _hmtController,
-      _monthlyBillController,
       _consumptionController,
       _nameController,
       _phoneController,
@@ -163,12 +160,114 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     }
     _flowController.dispose();
     _hmtController.dispose();
-    _monthlyBillController.dispose();
     _consumptionController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     _cityController.dispose();
     super.dispose();
+  }
+
+  String _buildAssistantContext(_QuoteFormSpec spec) {
+    final buffer = StringBuffer();
+    buffer.writeln(
+      'Contexte client : Devis Heliantha Solaire (${spec.title} - ${spec.subtitle}).',
+    );
+    buffer.writeln(
+      'Étape actuelle dans le formulaire : ${_currentStep + 1}/$_totalSteps.',
+    );
+
+    switch (_kind) {
+      case _QuoteProjectKind.pumping:
+        buffer.writeln('Type : Pompage Solaire (Forage / Irrigation / Bassin).');
+        if (_pumpExisting != null) {
+          buffer.writeln(
+            _pumpExisting == true
+                ? 'Pompe déjà installée : Oui.'
+                : 'Projet de nouvelle pompe : Oui.',
+          );
+        }
+        if (_existingPumpCv != null) {
+          buffer.writeln(
+            'Puissance pompe sélectionnée : ${_existingPumpCv!.toStringAsFixed(1)} CV.',
+          );
+        }
+        if (_flowController.text.trim().isNotEmpty) {
+          buffer.writeln(
+            'Débit d\'eau souhaité : ${_flowController.text.trim()} m³/h.',
+          );
+        }
+        if (_hmtController.text.trim().isNotEmpty) {
+          buffer.writeln(
+            'Profondeur / HMT : ${_hmtController.text.trim()} m.',
+          );
+        }
+        break;
+
+      case _QuoteProjectKind.photovoltaic:
+        buffer.writeln('Type : Autoconsommation Photovoltaïque (Réduction de facture ONEE).');
+        if (_consumptionController.text.trim().isNotEmpty) {
+          buffer.writeln(
+            'Consommation mensuelle : ${_consumptionController.text.trim()} kWh/mois.',
+          );
+        }
+        if (_meterType.isNotEmpty) {
+          buffer.writeln('Compteur : $_meterType.');
+        }
+        if (_phase.isNotEmpty) {
+          buffer.writeln('Réseau électrique : $_phase.');
+        }
+        break;
+
+      case _QuoteProjectKind.hybrid:
+        buffer.writeln('Type : Solaire Hybride avec Stockage Batteries (Off-Grid / Secours).');
+        if (_consumptionController.text.trim().isNotEmpty) {
+          buffer.writeln(
+            'Consommation mensuelle : ${_consumptionController.text.trim()} kWh.',
+          );
+        }
+        if (_phase.isNotEmpty) {
+          buffer.writeln('Réseau électrique : $_phase.');
+        }
+        break;
+    }
+
+    if (_cityController.text.trim().isNotEmpty) {
+      buffer.writeln('Localisation / Ville : ${_cityController.text.trim()}.');
+    }
+
+    if (_result != null) {
+      final res = _result!;
+      buffer.writeln('--- Dimensionnement calculé par l\'algorithme Heliantha ---');
+      if (res.quoteNumber != null) {
+        buffer.writeln('Numéro de devis : ${res.quoteNumber}.');
+      }
+      if (res.powerKwc != null) {
+        buffer.writeln(
+          'Puissance solaire recommandée : ${res.powerKwc!.toStringAsFixed(2)} kWc.',
+        );
+      }
+      if (res.panelCount != null) {
+        buffer.writeln('Nombre de panneaux solaires : ${res.panelCount} panneaux.');
+      }
+      if (res.inverter != null) {
+        buffer.writeln('Onduleur ou variateur solaire : ${res.inverter}.');
+      }
+      if (res.batteryStorage != null) {
+        buffer.writeln('Stockage batteries : ${res.batteryStorage}.');
+      }
+      if (res.totalTtc != null) {
+        buffer.writeln(
+          'Prix total estimé : ${res.totalTtc!.toStringAsFixed(0)} MAD TTC.',
+        );
+      }
+    }
+
+    buffer.writeln(
+      'Mission de l\'assistant : Répondre avec expertise technique et commerciale au client marocain, '
+      'l\'aider à comprendre son devis, la rentabilité, les composants matériels et les garanties Heliantha.',
+    );
+
+    return buffer.toString().trim();
   }
 
   @override
@@ -237,6 +336,13 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
           // 2. Contenu scrollable (Wizard ou Résultat)
           Positioned.fill(
             child: _result == null ? _buildWizard(spec) : _buildResult(spec),
+          ),
+          // 3. Orbe IA flottant déplaçable avec contexte projet dynamique
+          Positioned.fill(
+            child: AiFloatingOrb(
+              initialBottomMargin: _result == null ? 18 : 24,
+              contextPrompt: _buildAssistantContext(spec),
+            ),
           ),
         ],
       ),
@@ -600,30 +706,14 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   }
 
   Widget _buildEnergyFields() {
-    return Column(
-      children: [
-        _NumberField(
-          controller: _monthlyBillController,
-          label: 'Facture mensuelle moyenne (MAD)',
-          icon: Icons.receipt_long_outlined,
-          validator: _energyValidator,
-        ),
-        const SizedBox(height: 14),
-        _NumberField(
-          controller: _consumptionController,
-          label: 'Consommation (kWh/mois)',
-          icon: Icons.electric_meter_outlined,
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return null;
-            }
-            return _positiveValidator(
-              value,
-              fieldName: 'la consommation',
-            );
-          },
-        ),
-      ],
+    return _NumberField(
+      controller: _consumptionController,
+      label: 'Consommation mensuelle (kWh/mois)',
+      icon: Icons.electric_meter_outlined,
+      validator: (value) => _positiveValidator(
+        value,
+        fieldName: 'la consommation mensuelle (kWh/mois)',
+      ),
     );
   }
 
@@ -733,12 +823,12 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
           return 'Configurez votre type de compteur et d\'alimentation.';
         }
         if (_currentStep == 1) {
-          return 'Renseignez la facture ou la consommation mensuelle.';
+          return 'Renseignez votre consommation mensuelle en kWh.';
         }
         return 'Ces informations permettent de générer votre devis.';
       case _QuoteProjectKind.hybrid:
         if (_currentStep == 0) {
-          return 'Renseignez la facture ou la consommation mensuelle.';
+          return 'Renseignez votre consommation mensuelle en kWh.';
         }
         return 'Ces informations permettent de générer votre devis.';
     }
@@ -908,29 +998,11 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
 
   Map<String, dynamic> _energyPayload() {
     final payload = <String, dynamic>{};
-    final bill = _parseNumber(_monthlyBillController.text);
     final consumption = _parseNumber(_consumptionController.text);
-    if (bill != null) {
-      payload['monthly_bill'] = bill;
-    }
     if (consumption != null) {
       payload['monthly_consumption_kwh'] = consumption;
     }
     return payload;
-  }
-
-  String? _energyValidator(String? value) {
-    final bill = _parseNumber(value ?? '');
-    final consumption = _parseNumber(_consumptionController.text);
-    if (bill == null && consumption == null) {
-      return 'Renseignez la facture ou la consommation.';
-    }
-    if (value != null &&
-        value.trim().isNotEmpty &&
-        (bill == null || bill <= 0)) {
-      return 'La facture doit être un nombre positif.';
-    }
-    return null;
   }
 
   String? _positiveValidator(String? value, {required String fieldName}) {
