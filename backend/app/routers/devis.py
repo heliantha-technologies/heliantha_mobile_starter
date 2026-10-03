@@ -48,13 +48,13 @@ class PhotovoltaicInput(BaseModel):
         default="monophase",
         description="Type de reseau attendu par le moteur Flask.",
     )
-    meter_type: Literal["monophase", "triphase"] = Field(
-        default="monophase",
-        description="Type de compteur.",
+    meter_type: Literal["numerique", "mecanique"] = Field(
+        default="numerique",
+        description="Type de compteur attendu par le moteur Flask.",
     )
-    phase: Literal["1", "3"] = Field(
-        default="1",
-        description="Nombre de phases.",
+    phase: Literal["monophase", "triphase"] = Field(
+        default="monophase",
+        description="Phase attendue par le moteur Flask.",
     )
 
     model_config = ConfigDict(
@@ -63,8 +63,8 @@ class PhotovoltaicInput(BaseModel):
             "example": {
                 "monthly_consumption_kwh": 420.0,
                 "network_type": "monophase",
-                "meter_type": "monophase",
-                "phase": "1",
+                "meter_type": "numerique",
+                "phase": "monophase",
             }
         },
     )
@@ -80,13 +80,13 @@ class HybridInput(BaseModel):
         default="monophase",
         description="Type de reseau attendu par le moteur Flask.",
     )
-    meter_type: Literal["monophase", "triphase"] = Field(
-        default="monophase",
-        description="Type de compteur.",
+    meter_type: Literal["numerique", "mecanique"] = Field(
+        default="numerique",
+        description="Type de compteur attendu par le moteur Flask.",
     )
-    phase: Literal["1", "3"] = Field(
-        default="1",
-        description="Nombre de phases.",
+    phase: Literal["monophase", "triphase"] = Field(
+        default="monophase",
+        description="Phase attendue par le moteur Flask.",
     )
 
     model_config = ConfigDict(
@@ -95,8 +95,8 @@ class HybridInput(BaseModel):
             "example": {
                 "monthly_consumption_kwh": 520.0,
                 "network_type": "triphase",
-                "meter_type": "triphase",
-                "phase": "3",
+                "meter_type": "numerique",
+                "phase": "triphase",
             }
         },
     )
@@ -156,8 +156,8 @@ class QuoteRequest(BaseModel):
                     "data": {
                         "monthly_consumption_kwh": 420.0,
                         "network_type": "monophase",
-                        "meter_type": "monophase",
-                        "phase": "1",
+                        "meter_type": "numerique",
+                        "phase": "monophase",
                     },
                     "contact": {
                         "name": "Client PV",
@@ -170,8 +170,8 @@ class QuoteRequest(BaseModel):
                     "data": {
                         "monthly_consumption_kwh": 520.0,
                         "network_type": "triphase",
-                        "meter_type": "triphase",
-                        "phase": "3",
+                        "meter_type": "numerique",
+                        "phase": "triphase",
                     },
                 },
                 {
@@ -248,51 +248,40 @@ def _data_validation_error(project_type: str, exc: ValidationError) -> HTTPExcep
     )
 
 
-def _normalize_network_value(value: Any) -> str:
-    if _is_missing(value):
-        return "monophase"
-    if not isinstance(value, str):
-        raise HTTPException(
-            status_code=400,
-            detail="Type de reseau invalide : network_type doit etre monophase ou triphase.",
-        )
-
-    normalized = value.strip().lower().replace("-", "").replace("_", "")
-    normalized = "".join(normalized.split())
-    if normalized not in {"monophase", "triphase"}:
-        raise HTTPException(
-            status_code=400,
-            detail="Le type de reseau doit etre monophase ou triphase.",
-        )
-    return normalized
+def _normalize_phase(data: dict[str, Any]) -> str:
+    raw_phase = str(data.get("phase") or data.get("network_type") or "").strip().lower()
+    return "triphase" if ("tri" in raw_phase or raw_phase == "3") else "monophase"
 
 
-def _normalize_network_data(data: dict[str, Any]) -> dict[str, Any]:
+def _normalize_meter_type(data: dict[str, Any]) -> str:
+    raw_meter = str(data.get("meter_type") or "").strip().lower()
+    mechanical_markers = ["mecanique", "disque", "analogue"]
+    if any(marker in raw_meter for marker in mechanical_markers):
+        return "mecanique"
+    return "numerique"
+
+
+def _normalize_electric_data(data: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(data)
-    network_source = normalized.get("network_type")
-    if _is_missing(network_source):
-        network_source = normalized.get("meter_type")
-    if _is_missing(network_source):
-        network_source = "monophase"
-    network_type = _normalize_network_value(network_source)
-    normalized["network_type"] = network_type
-    normalized["meter_type"] = network_type
-    normalized["phase"] = "3" if network_type == "triphase" else "1"
-    return normalized
+    phase = _normalize_phase(normalized)
+    normalized["phase"] = phase
+    normalized["network_type"] = phase
+    normalized["meter_type"] = _normalize_meter_type(normalized)
 
+    if not normalized.get("monthly_consumption_kwh"):
+        bill = _to_float(normalized.get("monthly_bill") or 0, "monthly_bill")
+        normalized["monthly_consumption_kwh"] = round(bill / 1.15, 2) if bill > 0 else 500.0
 
-def _ensure_monthly_consumption(data: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(data)
-    if _is_missing(normalized.get("monthly_consumption_kwh")) and not _is_missing(
-        normalized.get("monthly_bill")
-    ):
-        monthly_bill = _to_float(normalized["monthly_bill"], "monthly_bill")
-        normalized["monthly_consumption_kwh"] = round(monthly_bill / 1.15, 2)
-    return normalized
+    return {
+        "monthly_consumption_kwh": normalized["monthly_consumption_kwh"],
+        "phase": normalized["phase"],
+        "network_type": normalized["network_type"],
+        "meter_type": normalized["meter_type"],
+    }
 
 
 def _normalize_photovoltaic_data(data: dict[str, Any]) -> dict[str, Any]:
-    prepared = _normalize_network_data(_ensure_monthly_consumption(data))
+    prepared = _normalize_electric_data(data)
     try:
         model = PhotovoltaicInput.model_validate(prepared)
     except ValidationError as exc:
@@ -301,7 +290,7 @@ def _normalize_photovoltaic_data(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_hybrid_data(data: dict[str, Any]) -> dict[str, Any]:
-    prepared = _normalize_network_data(_ensure_monthly_consumption(data))
+    prepared = _normalize_electric_data(data)
     try:
         model = HybridInput.model_validate(prepared)
     except ValidationError as exc:
@@ -311,19 +300,18 @@ def _normalize_hybrid_data(data: dict[str, Any]) -> dict[str, Any]:
 
 def _normalize_pumping_data(data: dict[str, Any]) -> dict[str, Any]:
     prepared = dict(data)
+    if _is_missing(prepared.get("pump_existing")):
+        prepared["pump_existing"] = False
     if _is_missing(prepared.get("flow_m3_h")):
-        if not _is_missing(prepared.get("flow_rate")):
-            prepared["flow_m3_h"] = prepared["flow_rate"]
-        elif not _is_missing(prepared.get("flow_m3_day")):
-            prepared["flow_m3_h"] = round(
-                _to_float(prepared["flow_m3_day"], "flow_m3_day") / 6,
-                2,
-            )
+        flow_m3_day = _to_float(prepared.get("flow_m3_day", 30), "flow_m3_day")
+        prepared["flow_m3_h"] = round(flow_m3_day / 6, 2)
     if _is_missing(prepared.get("hmt_m")):
-        if not _is_missing(prepared.get("total_head_m")):
-            prepared["hmt_m"] = prepared["total_head_m"]
-        elif not _is_missing(prepared.get("profondeur")):
+        if not _is_missing(prepared.get("profondeur")):
             prepared["hmt_m"] = prepared["profondeur"]
+        elif not _is_missing(prepared.get("total_head_m")):
+            prepared["hmt_m"] = prepared["total_head_m"]
+        else:
+            prepared["hmt_m"] = 50.0
 
     try:
         model = PumpingInput.model_validate(prepared)
