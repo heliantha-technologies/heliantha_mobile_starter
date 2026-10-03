@@ -18,6 +18,7 @@ from app.api.routes import (
 from app.clients.bridge import PrestaShopBridgeClient
 from app.clients.prestashop import PrestaShopClient
 from app.core.config import get_settings
+from app.routers import devis
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(orders.router, prefix=settings.api_prefix)
 app.include_router(notifications.router, prefix=settings.api_prefix)
 app.include_router(favorites.router, prefix=settings.api_prefix)
+app.include_router(devis.router)
 
 
 @app.get("/")
