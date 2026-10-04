@@ -102,17 +102,13 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
                 final gap = veryShortHeight ? 8.0 : 12.0;
                 final heroHeight =
                     veryShortHeight ? 56.0 : (shortHeight ? 66.0 : 78.0);
-                final gridHeight =
-                    constraints.maxHeight - (vertical * 2) - heroHeight - gap;
-                final cardHeight =
-                    ((gridHeight - (gap * 2)) / 3).clamp(90.0, 195.0);
 
                 return Padding(
                   padding: EdgeInsets.fromLTRB(
                     horizontal,
                     vertical,
                     horizontal,
-                    vertical,
+                    0,
                   ),
                   child: Column(
                     children: [
@@ -120,15 +116,17 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
                       SizedBox(height: gap),
                       Expanded(
                         child: GridView.builder(
-                          padding: EdgeInsets.zero,
-                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 76),
+                          physics: const BouncingScrollPhysics(),
                           itemCount: _projects.length,
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
+                            crossAxisCount:
+                                constraints.maxWidth >= 720 ? 3 : 2,
                             crossAxisSpacing: gap,
                             mainAxisSpacing: gap,
-                            mainAxisExtent: cardHeight,
+                            childAspectRatio:
+                                constraints.maxWidth >= 720 ? 0.90 : 0.76,
                           ),
                           itemBuilder: (context, index) {
                             final project = _projects[index];
@@ -269,152 +267,135 @@ class _ProjectCardState extends State<_ProjectCard> {
   Widget build(BuildContext context) {
     final project = widget.project;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final ultra = constraints.maxHeight < 100;
-        final tiny = constraints.maxHeight < 130;
-        final compact = constraints.maxHeight < 155;
-        final padding = ultra ? 6.0 : (tiny ? 8.0 : (compact ? 10.0 : 13.0));
-        final iconBoxSize = ultra ? 26.0 : (tiny ? 30.0 : (compact ? 34.0 : 38.0));
-        final emojiSize = ultra ? 14.0 : (tiny ? 16.0 : (compact ? 18.0 : 20.0));
-        final buttonHeight = tiny ? 30.0 : (compact ? 34.0 : 38.0);
-        final hideDescription = constraints.maxHeight < 128;
-
-        return AnimatedScale(
-          scale: _pressed ? 0.97 : 1.0,
-          duration: const Duration(milliseconds: 130),
-          curve: Curves.easeOutCubic,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF0F2537).withValues(alpha: 0.08),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+    return AnimatedScale(
+      scale: _pressed ? 0.97 : 1.0,
+      duration: const Duration(milliseconds: 130),
+      curve: Curves.easeOutCubic,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F2537).withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(24),
-                onTap: widget.onTap,
-                onTapDown: (_) => setState(() => _pressed = true),
-                onTapUp: (_) => setState(() => _pressed = false),
-                onTapCancel: () => setState(() => _pressed = false),
-                child: Padding(
-                  padding: EdgeInsets.all(padding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Badge icône squircle pastel avec l'émoji exact
-                      Container(
-                        width: iconBoxSize,
-                        height: iconBoxSize,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F5FA),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          project.emoji,
-                          style: TextStyle(fontSize: emojiSize),
-                        ),
-                      ),
-                      SizedBox(height: ultra ? 3 : (tiny ? 5 : 8)),
-                      // Section Textes (Titre + Tag éventuel + Description)
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: ultra
-                              ? MainAxisAlignment.center
-                              : MainAxisAlignment.start,
-                          children: [
-                            Text(
-                              project.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: const Color(0xFF162D42),
-                                fontWeight: FontWeight.w800,
-                                fontSize: tiny ? 13.0 : 15.0,
-                                height: 1.15,
-                              ),
-                            ),
-                            if (project.tag != null) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                project.tag!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: const Color(0xFF2B4D66),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: compact ? 10.5 : 11.5,
-                                ),
-                              ),
-                            ],
-                            if (!hideDescription) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                project.description,
-                                maxLines: compact ? 1 : 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: const Color(0xFF5A7184),
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: compact ? 10.5 : 11.5,
-                                  height: 1.2,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      // Bouton d'action capsule en Bleu Pétrole Nuit
-                      if (!ultra)
-                        Container(
-                          width: double.infinity,
-                          height: buttonHeight,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF223E56),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                              ),
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  project.buttonLabel,
-                                  maxLines: 1,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 11.8,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(22),
+            onTap: widget.onTap,
+            onTapDown: (_) => setState(() => _pressed = true),
+            onTapUp: (_) => setState(() => _pressed = false),
+            onTapCancel: () => setState(() => _pressed = false),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Badge icône squircle pastel avec l'émoji exact
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F5FA),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      project.emoji,
+                      style: const TextStyle(fontSize: 18),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+
+                  // Titre
+                  Text(
+                    project.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF162D42),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14.0,
+                      height: 1.15,
+                    ),
+                  ),
+
+                  // Tag éventuel (ex: Off-Grid, Photovoltaïque, Hybride)
+                  if (project.tag != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      project.tag!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF2B4D66),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11.0,
+                      ),
+                    ),
+                  ],
+
+                  // Sous-titre / description
+                  const SizedBox(height: 3),
+                  Text(
+                    project.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF5A7184),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 11.0,
+                      height: 1.25,
+                    ),
+                  ),
+
+                  // Spacer pour ancrer le bouton tout en bas de la carte sans jamais recouvrir le texte
+                  const Spacer(),
+
+                  // Bouton d'action capsule en Bleu Pétrole Nuit
+                  Container(
+                    width: double.infinity,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF223E56),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            project.buttonLabel,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
