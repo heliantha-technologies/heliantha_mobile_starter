@@ -1,17 +1,13 @@
+import 'package:flutter/foundation.dart';
+
 class AppConfig {
-  static const productionApiBaseUrl = 'https://api.heliantha.ma';
+  static const String apiBaseUrl =
+      kIsWeb ? '' : 'https://app.heliantha.ma';
+  static const productionApiBaseUrl = 'https://app.heliantha.ma';
   static const productionAppBaseUrl = 'https://app.heliantha.ma';
 
-  static const _apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
   static const _appBaseUrlOverride = String.fromEnvironment('APP_BASE_URL');
   static const _isRelease = bool.fromEnvironment('dart.vm.product');
-
-  static String get apiBaseUrl {
-    return _resolveBaseUrl(
-      _apiBaseUrlOverride,
-      defaultValue: productionApiBaseUrl,
-    );
-  }
 
   static String get appBaseUrl {
     return _resolveBaseUrl(
@@ -22,6 +18,19 @@ class AppConfig {
 
   static String productShareUrl(int productId) {
     return '${appBaseUrl.replaceAll(RegExp(r'/$'), '')}/product/$productId';
+  }
+
+  static String resolvePdfUrl(String? rawUrl) {
+    if (rawUrl == null) return '';
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('/')) {
+      return 'https://app.heliantha.ma$trimmed';
+    }
+    return 'https://app.heliantha.ma/$trimmed';
   }
 
   static String _resolveBaseUrl(

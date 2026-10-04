@@ -16,9 +16,9 @@ class AssistantApiService {
       : _dio = dio ??
             Dio(
               BaseOptions(
-                connectTimeout: const Duration(seconds: 15),
-                receiveTimeout: const Duration(seconds: 15),
-                sendTimeout: const Duration(seconds: 15),
+                connectTimeout: const Duration(seconds: 45),
+                receiveTimeout: const Duration(seconds: 60),
+                sendTimeout: const Duration(seconds: 45),
                 headers: const {
                   'Content-Type': 'application/json',
                   'Accept': 'application/json',
@@ -124,12 +124,12 @@ class AssistantApiService {
 
       return "Je n'ai pas pu traiter votre demande.";
     } on TimeoutException {
-      return 'Le serveur d\'intelligence artificielle met trop de temps à répondre (timeout 15s). Veuillez réessayer.';
+      return 'Le serveur d\'intelligence artificielle met trop de temps à répondre (timeout 60s). Veuillez réessayer.';
     } on DioException catch (dioError) {
       if (dioError.type == DioExceptionType.connectionTimeout ||
           dioError.type == DioExceptionType.receiveTimeout ||
           dioError.type == DioExceptionType.sendTimeout) {
-        return 'Délai d\'attente dépassé (15s). Le conseiller IA est temporairement occupé, merci de relancer votre question.';
+        return 'Délai d\'attente dépassé (60s). Le conseiller IA est temporairement occupé, merci de relancer votre question.';
       }
       if (dioError.type == DioExceptionType.connectionError) {
         return 'Connexion au serveur IA impossible. Vérifiez votre accès réseau.';

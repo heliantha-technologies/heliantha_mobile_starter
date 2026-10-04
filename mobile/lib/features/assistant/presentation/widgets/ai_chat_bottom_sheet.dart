@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -100,13 +101,19 @@ class ChatDevisData {
             json['equipement'])
         ?.toString();
 
-    final pdf = (json['pdf_url'] ??
+    final rawPdf = (json['pdf_url'] ??
             json['pdfUrl'] ??
             json['download_url'] ??
             json['downloadUrl'] ??
             json['pdf'] ??
             json['url'])
         ?.toString();
+
+    final pdf = AppConfig.resolvePdfUrl(
+      rawPdf != null && rawPdf.trim().isNotEmpty
+          ? rawPdf
+          : '/api/devis/pdf/${Uri.encodeComponent(ref)}',
+    );
 
     return ChatDevisData(
       reference: ref,
@@ -282,14 +289,20 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animated = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (!_scrollController.hasClients) return;
+      final target = _scrollController.position.maxScrollExtent;
+      if ((_scrollController.offset - target).abs() < 4) return;
+
+      if (animated) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent + 80,
-          duration: const Duration(milliseconds: 220),
+          target,
+          duration: const Duration(milliseconds: 250),
           curve: Curves.easeOutCubic,
         );
+      } else {
+        _scrollController.jumpTo(target);
       }
     });
   }
@@ -305,10 +318,9 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
         lower.contains('cv') ||
         lower.contains('eau')) {
       return [
-        'Analyse de vos paramètres de pompage et forage...',
+        'Analyse de vos paramètres de pompage...',
         'Calcul du débit et de la hauteur d\'élévation...',
         'Sélection des équipements solaires adaptés...',
-        'Finalisation de votre recommandation...',
       ];
     } else if (lower.contains('batteri') ||
         lower.contains('lithium') ||
@@ -316,10 +328,9 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
         lower.contains('hybride') ||
         lower.contains('autonomi')) {
       return [
-        'Étude de vos besoins en autonomie électrique...',
+        'Étude de votre autonomie électrique...',
         'Dimensionnement du stockage batteries...',
-        'Optimisation de la configuration hybride...',
-        'Finalisation de votre recommandation...',
+        'Optimisation de la solution hybride...',
       ];
     } else if (lower.contains('factur') ||
         lower.contains('onee') ||
@@ -332,16 +343,13 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
       return [
         'Analyse de votre consommation électrique...',
         'Calcul des économies photovoltaïques...',
-        'Dimensionnement des panneaux recommandés...',
-        'Finalisation de votre recommandation...',
+        'Dimensionnement optimal des modules...',
       ];
     }
 
     return [
       'Recherche de la solution HeliAntha adaptée...',
-      'Vérification des options techniques optimales...',
       'Personnalisation de vos conseils...',
-      'Finalisation de votre réponse...',
     ];
   }
 
@@ -379,24 +387,24 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
 
     _scrollToBottom();
 
-    // 3. Animation fluide des étapes pour rassurer le client pendant le calcul
+    // 3. Animation douce et stable des étapes
     int currentStepIndex = 0;
 
     _thinkingTimer?.cancel();
-    _thinkingTimer = Timer.periodic(const Duration(milliseconds: 1400), (timer) {
+    _thinkingTimer = Timer.periodic(const Duration(milliseconds: 2500), (timer) {
       if (!mounted || !assistantMessage.isThinking) {
         timer.cancel();
         return;
       }
       currentStepIndex++;
-      setState(() {
-        if (currentStepIndex < steps.length) {
+      if (currentStepIndex < steps.length) {
+        setState(() {
           assistantMessage.thinkingStep = steps[currentStepIndex];
-        } else {
-          assistantMessage.thinkingStep = 'Finalisation de votre réponse...';
-        }
-      });
-      _scrollToBottom();
+        });
+      } else {
+        timer.cancel();
+      }
+      // Hauteur fixe et stable : l'écran reste parfaitement immobile
     });
 
     // 4. Construction de l'historique de discussion
@@ -443,19 +451,18 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
     }
   }
 
-  /// Animation de frappe fluide (Typewriter) pour un affichage dynamique sans à-coup
+  /// Animation de frappe fluide (Typewriter) pour un affichage dynamique et apaisé
   void _streamResponse(_ChatMessage message, String fullText) {
     _streamingTimer?.cancel();
     int charIndex = 0;
     final total = fullText.length;
-    // Vitesse adaptée selon la longueur du texte
     final step = (total / 50).clamp(2, 6).toInt();
 
     setState(() {
       message.isStreaming = true;
     });
 
-    _streamingTimer = Timer.periodic(const Duration(milliseconds: 22), (timer) {
+    _streamingTimer = Timer.periodic(const Duration(milliseconds: 28), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -470,7 +477,12 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
           timer.cancel();
         }
       });
-      _scrollToBottom();
+      if (_scrollController.hasClients) {
+        final max = _scrollController.position.maxScrollExtent;
+        if (_scrollController.offset < max) {
+          _scrollController.jumpTo(max);
+        }
+      }
     });
   }
 
@@ -962,9 +974,9 @@ class _ChatMessageTile extends StatelessWidget {
   }
 }
 
-/// Indicateur de réflexion dynamique, rassurant et élégant (style Apple Intelligence)
+/// Indicateur de réflexion élégant, apaisé et stable (style Apple Intelligence / iMessage)
 class _ThinkingIndicator extends StatefulWidget {
-  const _ThinkingIndicator({required this.step});
+  const _ThinkingIndicator({this.step = ''});
 
   final String step;
 
@@ -981,8 +993,8 @@ class _ThinkingIndicatorState extends State<_ThinkingIndicator>
     super.initState();
     _anim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
   }
 
   @override
@@ -993,48 +1005,93 @@ class _ThinkingIndicatorState extends State<_ThinkingIndicator>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (context, child) {
-        final opacity = 0.65 + (_anim.value * 0.35);
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFFBEB),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: const Color(0xFFFDE68A).withValues(alpha: opacity),
-              width: 1.1,
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+          BoxShadow(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 3 points ondulants élégants (Apple / iOS typing wave)
+          _TypingDots(controller: _anim),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              widget.step.isNotEmpty
+                  ? widget.step
+                  : 'HeliAntha prépare votre réponse...',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.1,
+              ),
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Color(0xFFD97706).withValues(alpha: opacity),
+        ],
+      ),
+    );
+  }
+}
+
+/// 3 points lumineux à pulsation douce déphasée (style iOS / iMessage)
+class _TypingDots extends StatelessWidget {
+  const _TypingDots({required this.controller});
+
+  final AnimationController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (index) {
+            final delay = index * 0.22;
+            final t = (controller.value - delay) % 1.0;
+            final wave = math.sin(t * math.pi * 2);
+            final translationY = wave * 2.2;
+            final opacity = 0.35 + (0.65 * ((wave + 1) / 2));
+
+            return Padding(
+              padding: EdgeInsets.only(right: index < 2 ? 4.0 : 0.0),
+              child: Transform.translate(
+                offset: Offset(0, -translationY),
+                child: Container(
+                  width: 6.5,
+                  height: 6.5,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: index == 1
+                        ? const Color(0xFFF59E0B).withValues(alpha: opacity)
+                        : const Color(0xFF0F172A).withValues(alpha: opacity),
                   ),
                 ),
               ),
-              const SizedBox(width: 9),
-              Flexible(
-                child: Text(
-                  widget.step.isNotEmpty
-                      ? widget.step
-                      : 'HeliAntha prépare votre réponse...',
-                  style: const TextStyle(
-                    color: Color(0xFF92400E),
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            );
+          }),
         );
       },
     );
@@ -1142,26 +1199,26 @@ class _ChatMessageQuoteCardState extends State<_ChatMessageQuoteCard>
     return buffer.toString();
   }
 
-  static String _resolvePdfUrl(String? rawUrl, String reference) {
-    final origin = AppConfig.appBaseUrl.trim().replaceAll(RegExp(r'/$'), '');
-    final effectiveOrigin =
-        origin.isNotEmpty ? origin : 'https://app.heliantha.ma';
+  Future<void> _handleDownload(BuildContext context) async {
+    final pdfUrl = widget.devis.pdfUrl;
+    final targetUrl = AppConfig.resolvePdfUrl(
+      pdfUrl != null && pdfUrl.isNotEmpty
+          ? pdfUrl
+          : '/api/devis/pdf/${Uri.encodeComponent(widget.devis.reference)}',
+    );
 
-    if (rawUrl != null && rawUrl.trim().isNotEmpty) {
-      final trimmed = rawUrl.trim();
-      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-        return trimmed;
+    if (targetUrl.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('URL du devis PDF non disponible.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
-      final path = trimmed.startsWith('/') ? trimmed : '/$trimmed';
-      return '$effectiveOrigin$path';
+      return;
     }
 
-    return '$effectiveOrigin/api/devis/pdf/${Uri.encodeComponent(reference)}';
-  }
-
-  Future<void> _handleDownload(BuildContext context) async {
-    final targetUrl =
-        _resolvePdfUrl(widget.devis.pdfUrl, widget.devis.reference);
     try {
       final uri = Uri.parse(targetUrl);
       final launched = await launchUrl(

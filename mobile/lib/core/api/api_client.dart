@@ -4,13 +4,17 @@ import '../config/app_config.dart';
 import '../storage/token_storage.dart';
 
 class ApiClient {
+  static const String apiBaseUrl = AppConfig.apiBaseUrl;
+  static String resolvePdfUrl(String? rawUrl) => AppConfig.resolvePdfUrl(rawUrl);
+
   ApiClient(this._tokenStorage)
       : dio = Dio(
           BaseOptions(
             baseUrl: AppConfig.apiBaseUrl,
-            connectTimeout: const Duration(seconds: 15),
-            receiveTimeout: const Duration(seconds: 25),
-            headers: {'Accept': 'application/json'},
+            connectTimeout: const Duration(seconds: 45),
+            receiveTimeout: const Duration(seconds: 60),
+            sendTimeout: const Duration(seconds: 45),
+            headers: const {'Accept': 'application/json'},
           ),
         ) {
     dio.interceptors.add(

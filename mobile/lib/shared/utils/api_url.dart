@@ -29,8 +29,14 @@ String _normalizeAbsoluteUrl(Uri uri, String original) {
   return original;
 }
 
+String resolvePdfUrl(String? rawUrl) => AppConfig.resolvePdfUrl(rawUrl);
+
 String _rebaseOnConfiguredApi(Uri uri) {
-  final configured = Uri.parse(AppConfig.apiBaseUrl);
+  final baseStr = AppConfig.apiBaseUrl.trim();
+  if (baseStr.isEmpty) {
+    return uri.path.startsWith('/') ? uri.path : '/${uri.path}';
+  }
+  final configured = Uri.parse(baseStr);
   return configured
       .replace(
         path: uri.path,

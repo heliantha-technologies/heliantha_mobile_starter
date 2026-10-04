@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
 const helianthaBackgroundAsset = 'assets/brand/fond_arriere_plan.png';
+const helianthaSolarIosBackgroundAsset = 'assets/brand/solar_ios_bg.jpg';
 
 class HelianthaBackground extends StatelessWidget {
   const HelianthaBackground({

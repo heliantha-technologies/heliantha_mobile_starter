@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:open_filex/open_filex.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/config/app_config.dart';
 
 class QuoteRepository {
   QuoteRepository(this._api);
@@ -12,10 +13,22 @@ class QuoteRepository {
 
   Future<QuoteCalculationResult> calculate(QuoteRequestPayload payload) async {
     try {
-      final response = await _api.dio.post<Map<String, dynamic>>(
-        '/v1/devis/calculer',
-        data: payload.toJson(),
-      );
+      Response<Map<String, dynamic>> response;
+      try {
+        response = await _api.dio.post<Map<String, dynamic>>(
+          '/v1/devis/calculer',
+          data: payload.toJson(),
+        );
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          response = await _api.dio.post<Map<String, dynamic>>(
+            '/api/calculate',
+            data: payload.toJson(),
+          );
+        } else {
+          rethrow;
+        }
+      }
       final data = response.data;
       if (data == null) {
         throw const QuoteApiException('Réponse vide du moteur de devis.');
@@ -29,13 +42,28 @@ class QuoteRepository {
   Future<String?> downloadAndOpenPdf(String quoteIdentifier) async {
     try {
       final safeIdentifier = Uri.encodeComponent(quoteIdentifier.trim());
-      final response = await _api.dio.get<Object>(
-        '/v1/devis/$safeIdentifier/pdf',
-        options: Options(
-          responseType: ResponseType.bytes,
-          headers: {'Accept': 'application/pdf'},
-        ),
-      );
+      Response<Object> response;
+      try {
+        response = await _api.dio.get<Object>(
+          '/v1/devis/$safeIdentifier/pdf',
+          options: Options(
+            responseType: ResponseType.bytes,
+            headers: {'Accept': 'application/pdf'},
+          ),
+        );
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          response = await _api.dio.get<Object>(
+            '/api/devis/pdf/$safeIdentifier',
+            options: Options(
+              responseType: ResponseType.bytes,
+              headers: {'Accept': 'application/pdf'},
+            ),
+          );
+        } else {
+          rethrow;
+        }
+      }
       final bytes = _extractBytes(response.data);
       if (bytes.isEmpty) {
         throw const QuoteApiException('Le PDF reçu est vide.');
@@ -168,6 +196,29 @@ class QuoteCalculationResult {
         'numero_devis',
         'id',
       ]);
+
+  String? get pdfUrl => _stringValue([
+        'pdf_url',
+        'pdfUrl',
+        'download_url',
+        'downloadUrl',
+        'pdf',
+        'url',
+      ]);
+
+  String get resolvedPdfUrl {
+    final raw = pdfUrl;
+    if (raw != null && raw.trim().isNotEmpty) {
+      return AppConfig.resolvePdfUrl(raw);
+    }
+    final num = quoteNumber;
+    if (num != null && num.trim().isNotEmpty) {
+      return AppConfig.resolvePdfUrl(
+        '/v1/devis/${Uri.encodeComponent(num.trim())}/pdf',
+      );
+    }
+    return '';
+  }
 
   double? get totalTtc => _numberValue([
         'total_ttc',

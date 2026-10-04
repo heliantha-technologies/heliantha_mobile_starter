@@ -67,10 +67,10 @@ class _AiFloatingOrbState extends State<AiFloatingOrb>
       ),
     );
 
-    _sparkleScaleAnimation = Tween<double>(begin: 0.92, end: 1.14).animate(
+    _sparkleScaleAnimation = Tween<double>(begin: 0.95, end: 1.07).animate(
       CurvedAnimation(
         parent: _blinkController,
-        curve: Curves.easeInOutBack,
+        curve: Curves.easeInOutSine,
       ),
     );
 

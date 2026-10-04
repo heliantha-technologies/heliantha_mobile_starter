@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../shared/theme/app_tokens.dart';
 import '../../../shared/widgets/app_background.dart';
 import '../../../shared/widgets/app_feedback.dart';
@@ -936,28 +938,52 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
 
   Future<void> _downloadPdf() async {
     final quoteNumber = _result?.quoteNumber;
-    if (quoteNumber == null || quoteNumber.isEmpty) {
-      AppFeedback.warning(context, 'Référence devis indisponible.');
+    final resolvedUrl = _result?.resolvedPdfUrl ??
+        AppConfig.resolvePdfUrl(
+          quoteNumber != null && quoteNumber.isNotEmpty
+              ? '/v1/devis/${Uri.encodeComponent(quoteNumber)}/pdf'
+              : '',
+        );
+
+    if (resolvedUrl.isEmpty) {
+      AppFeedback.warning(context, 'Référence devis ou URL PDF indisponible.');
       return;
     }
 
     setState(() => _downloadingPdf = true);
     try {
-      await ref.read(quoteRepositoryProvider).downloadAndOpenPdf(quoteNumber);
-      if (!mounted) {
-        return;
+      final uri = Uri.parse(resolvedUrl);
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        if (quoteNumber != null && quoteNumber.isNotEmpty) {
+          await ref.read(quoteRepositoryProvider).downloadAndOpenPdf(quoteNumber);
+        } else {
+          throw const QuoteApiException('Impossible d\'ouvrir le devis PDF.');
+        }
       }
-      AppFeedback.success(context, 'PDF enregistré.');
+      if (mounted) {
+        AppFeedback.success(context, 'Devis PDF prêt.');
+      }
     } on QuoteApiException catch (error) {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        AppFeedback.error(context, error.message);
       }
-      AppFeedback.error(context, error.message);
     } catch (_) {
-      if (!mounted) {
-        return;
+      try {
+        if (quoteNumber != null && quoteNumber.isNotEmpty) {
+          await ref.read(quoteRepositoryProvider).downloadAndOpenPdf(quoteNumber);
+          if (mounted) {
+            AppFeedback.success(context, 'PDF enregistré.');
+          }
+          return;
+        }
+      } catch (_) {}
+      if (mounted) {
+        AppFeedback.error(context, 'Impossible de télécharger le devis PDF.');
       }
-      AppFeedback.error(context, 'Impossible de télécharger le PDF.');
     } finally {
       if (mounted) {
         setState(() => _downloadingPdf = false);
