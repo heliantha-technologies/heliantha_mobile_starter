@@ -196,15 +196,65 @@ class AiChatBottomSheet extends ConsumerStatefulWidget {
     String? contextPrompt,
     String? initialQuestion,
   }) {
+    final isDesktop = MediaQuery.sizeOf(context).width >= 768;
+    final chat = AiChatBottomSheet(
+      contextPrompt: contextPrompt,
+      initialQuestion: initialQuestion,
+    );
+
+    if (isDesktop) {
+      return showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: 'Fermer le conseiller solaire IA',
+        barrierColor: const Color(0xFF0F172A).withValues(alpha: 0.18),
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (dialogContext, animation, secondaryAnimation) {
+          final mediaQuery = MediaQuery.of(dialogContext);
+          final availableHeight =
+              mediaQuery.size.height - mediaQuery.viewInsets.bottom;
+          final panelHeight = math.min(620.0, availableHeight * 0.75);
+
+          return Align(
+            alignment: Alignment.bottomRight,
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: 24,
+                bottom: 24 + mediaQuery.viewInsets.bottom,
+              ),
+              child: SizedBox(
+                width: 420,
+                height: panelHeight,
+                child: chat,
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (context, animation, secondaryAnimation, child) {
+          final curvedAnimation = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
+          return FadeTransition(
+            opacity: curvedAnimation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.06),
+                end: Offset.zero,
+              ).animate(curvedAnimation),
+              child: child,
+            ),
+          );
+        },
+      );
+    }
+
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: const Color(0xFF0F172A).withValues(alpha: 0.45),
-      builder: (sheetContext) => AiChatBottomSheet(
-        contextPrompt: contextPrompt,
-        initialQuestion: initialQuestion,
-      ),
+      builder: (sheetContext) => chat,
     );
   }
 
@@ -226,27 +276,33 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
   static const _defaultSuggestions = [
     _ChatSuggestion(
       label: '💧 Pompage solaire',
-      query: 'Je souhaite des conseils sur le pompage solaire pour mon forage ou mon bassin.',
+      query:
+          'Je souhaite des conseils sur le pompage solaire pour mon forage ou mon bassin.',
     ),
     _ChatSuggestion(
       label: '☀️ Réduire ma facture',
-      query: 'Comment fonctionne l\'autoconsommation photovoltaïque pour réduire ma facture d\'électricité ?',
+      query:
+          'Comment fonctionne l\'autoconsommation photovoltaïque pour réduire ma facture d\'électricité ?',
     ),
     _ChatSuggestion(
       label: '🔋 Solaire avec batteries',
-      query: 'Pouvez-vous m\'expliquer l\'installation solaire hybride avec stockage batteries ?',
+      query:
+          'Pouvez-vous m\'expliquer l\'installation solaire hybride avec stockage batteries ?',
     ),
     _ChatSuggestion(
       label: '🏠 Site sans réseau',
-      query: 'Quelles solutions proposez-vous pour un site isolé sans réseau électrique (Off-Grid) ?',
+      query:
+          'Quelles solutions proposez-vous pour un site isolé sans réseau électrique (Off-Grid) ?',
     ),
     _ChatSuggestion(
       label: '♨️ Chauffage solaire',
-      query: 'Comment fonctionne un chauffe-eau solaire thermique pour l\'eau chaude ?',
+      query:
+          'Comment fonctionne un chauffe-eau solaire thermique pour l\'eau chaude ?',
     ),
     _ChatSuggestion(
       label: '🚗 Recharge électrique',
-      query: 'Proposez-vous des bornes de recharge pour véhicules électriques ?',
+      query:
+          'Proposez-vous des bornes de recharge pour véhicules électriques ?',
     ),
   ];
 
@@ -255,8 +311,7 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
     super.initState();
 
     // Message d'accueil pro, chaleureux et concis
-    const welcome =
-        'Bonjour ! Je suis votre conseiller solaire HeliAntha.\n\n'
+    const welcome = 'Bonjour ! Je suis votre conseiller solaire HeliAntha.\n\n'
         'Je suis à votre disposition pour vous orienter sur nos solutions : '
         'pompage solaire, réduction de facture, batteries, site isolé, chauffe-eau ou borne de recharge.\n\n'
         'Comment puis-je vous accompagner aujourd\'hui ?';
@@ -391,7 +446,8 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
     int currentStepIndex = 0;
 
     _thinkingTimer?.cancel();
-    _thinkingTimer = Timer.periodic(const Duration(milliseconds: 2500), (timer) {
+    _thinkingTimer =
+        Timer.periodic(const Duration(milliseconds: 2500), (timer) {
       if (!mounted || !assistantMessage.isThinking) {
         timer.cancel();
         return;
@@ -489,21 +545,26 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final bottomInset = mediaQuery.viewInsets.bottom;
-    final totalHeight = mediaQuery.size.height * 0.82;
+    final isDesktop = mediaQuery.size.width >= 768;
+    final bottomInset = isDesktop ? 0.0 : mediaQuery.viewInsets.bottom;
+    final totalHeight = isDesktop
+        ? math.min(620.0, mediaQuery.size.height * 0.75)
+        : mediaQuery.size.height * 0.82;
+    final borderRadius = isDesktop
+        ? BorderRadius.circular(20)
+        : const BorderRadius.vertical(top: Radius.circular(32));
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        borderRadius: borderRadius,
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            height: totalHeight,
+            height: isDesktop ? null : totalHeight,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.94),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(32)),
+              color: Colors.white.withValues(alpha: isDesktop ? 0.88 : 0.94),
+              borderRadius: borderRadius,
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.90),
                 width: 1.2,
@@ -521,7 +582,8 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
                 // 1. En-tête iOS épuré
                 _buildHeader(context),
 
-                const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                const Divider(
+                    height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
 
                 // 2. Suggestions rapides horizontales (Chips)
                 _buildQuickSuggestions(),
@@ -952,8 +1014,7 @@ class _ChatMessageTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (message.isStreaming)
-                          const _BlinkingCursor(),
+                        if (message.isStreaming) const _BlinkingCursor(),
                       ],
                     ),
 

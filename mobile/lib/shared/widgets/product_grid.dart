@@ -58,6 +58,82 @@ class ResponsiveProductGrid extends StatelessWidget {
   }
 }
 
+class ResponsiveProductSliverGrid extends StatelessWidget {
+  const ResponsiveProductSliverGrid({
+    super.key,
+    required this.products,
+    required this.onProductTap,
+  });
+
+  final List<Product> products;
+  final ValueChanged<Product> onProductTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final columns = _columnsFor(constraints.crossAxisExtent);
+        final spacing = constraints.crossAxisExtent < 420 ? 10.0 : 14.0;
+        final cellWidth =
+            (constraints.crossAxisExtent - spacing * (columns - 1)) / columns;
+
+        return SliverGrid(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisExtent: _extentFor(cellWidth),
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final product = products[index];
+              return ProductCard(
+                product: product,
+                onTap: () => onProductTap(product),
+              );
+            },
+            childCount: products.length,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class ProductSliverGridSkeleton extends StatelessWidget {
+  const ProductSliverGridSkeleton({
+    super.key,
+    this.itemCount = 6,
+  });
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final columns = _columnsFor(constraints.crossAxisExtent);
+        final spacing = constraints.crossAxisExtent < 420 ? 10.0 : 14.0;
+        final cellWidth =
+            (constraints.crossAxisExtent - spacing * (columns - 1)) / columns;
+
+        return SliverGrid(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisExtent: _extentFor(cellWidth),
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (_, __) => const _ProductCardSkeleton(),
+            childCount: itemCount,
+          ),
+        );
+      },
+    );
+  }
+}
+
 class ProductGridSkeleton extends StatelessWidget {
   const ProductGridSkeleton({
     super.key,

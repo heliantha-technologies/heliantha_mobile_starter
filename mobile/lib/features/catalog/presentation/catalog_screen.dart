@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -303,6 +303,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(maxWidth: 540),
       builder: (_) => _CategoryPickerSheet(
         categories: categories,
         selectedCategoryId: _categoryFilter,
@@ -352,72 +353,40 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         onPressed: _smartScrollBack,
       ),
       body: SafeArea(
-        child: ResponsivePagePadding(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _CatalogSearchBar(
+        child: CustomScrollView(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              floating: true,
+              delegate: _CatalogHeaderDelegate(
                 controller: _search,
                 hasSearch: _hasSearch,
                 onClear: _clearSearch,
                 onSearch: _loadFirstPage,
-              ),
-              const SizedBox(height: 10),
-              _CategoryFilterBar(
+                isDesktop: MediaQuery.sizeOf(context).width >= 768,
                 activeCategory: activeCategory,
+                productCount: products.length,
+                showProductCount: !_loading && _error == null,
                 onOpenCategories: _openCategoryPicker,
-                onClearCategory: () => _goToCategory(null),
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  const InfoPill(
-                    icon: Icons.verified_rounded,
-                    label: 'Produits Heliantha',
-                    backgroundColor: AppColors.softLeaf,
-                    foregroundColor: AppColors.leaf,
-                  ),
-                  if (widget.initialCategory != null)
-                    InfoPill(
-                      icon: Icons.category_rounded,
-                      label: activeCategory?.name ?? 'Catégorie sélectionnée',
-                      backgroundColor: AppColors.softSun,
-                      foregroundColor: AppColors.navy,
-                    ),
-                  if (!_loading && _error == null)
-                    InfoPill(
-                      icon: Icons.inventory_2_outlined,
-                      label: _productCountLabel(products.length),
-                      backgroundColor: AppColors.softBlue,
-                      foregroundColor: AppColors.blue,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Expanded(
-                child: _CatalogContent(
-                  loading: _loading,
-                  error: _error,
-                  products: products,
-                  hasMore: _hasMore,
-                  loadingMore: _loadingMore,
-                  scrollController: _scrollController,
-                  onRetry: _loadFirstPage,
-                  onOpenProduct: (product) {
-                    ref.read(catalogRepositoryProvider).rememberProduct(
-                          product,
-                        );
-                    context.push(
-                      '/product/${product.id}',
-                      extra: product,
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+            ),
+            _CatalogContentSliver(
+              loading: _loading,
+              error: _error,
+              products: products,
+              loadingMore: _loadingMore,
+              onRetry: _loadFirstPage,
+              onOpenProduct: (product) {
+                ref.read(catalogRepositoryProvider).rememberProduct(product);
+                context.push(
+                  '/product/${product.id}',
+                  extra: product,
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -489,50 +458,6 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
 String _productCountLabel(int count) {
   return count == 1 ? '1 produit' : '$count produits';
-}
-
-class _CategoryFilterBar extends StatelessWidget {
-  const _CategoryFilterBar({
-    required this.activeCategory,
-    required this.onOpenCategories,
-    required this.onClearCategory,
-  });
-
-  final Category? activeCategory;
-  final VoidCallback onOpenCategories;
-  final VoidCallback onClearCategory;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        FilledButton.tonalIcon(
-          onPressed: onOpenCategories,
-          icon: const Icon(Icons.grid_view_rounded, size: 18),
-          label: Text(activeCategory?.name ?? 'Catégories'),
-        ),
-        if (activeCategory != null)
-          InputChip(
-            avatar: const Icon(Icons.category_rounded, size: 16),
-            label: Text(
-              activeCategory!.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            onDeleted: onClearCategory,
-            deleteIcon: const Icon(Icons.close_rounded, size: 18),
-            backgroundColor: AppColors.softSun,
-            labelStyle: const TextStyle(
-              color: AppColors.navy,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-      ],
-    );
-  }
 }
 
 class _CategoryPickerSheet extends StatefulWidget {
@@ -729,24 +654,208 @@ class _CatalogSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SearchBar(
-      controller: controller,
-      hintText: 'Rechercher dans le catalogue...',
-      leading: const Icon(Icons.search_rounded, color: AppColors.muted),
-      trailing: [
-        if (hasSearch)
-          IconButton(
-            tooltip: 'Effacer',
-            onPressed: onClear,
-            icon: const Icon(Icons.close_rounded, color: AppColors.muted),
-          ),
-        IconButton(
-          tooltip: 'Rechercher',
-          onPressed: onSearch,
-          icon: const Icon(Icons.arrow_forward_rounded, color: AppColors.blue),
+    return SizedBox(
+      height: 44,
+      child: SearchBar(
+        controller: controller,
+        constraints: const BoxConstraints(
+          minHeight: 44,
+          maxHeight: 44,
         ),
+        shape: WidgetStateProperty.all(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: AppColors.premiumLine),
+          ),
+        ),
+        hintText: 'Rechercher un panneau, onduleur...',
+        leading: const Icon(Icons.search_rounded, color: AppColors.muted),
+        trailing: [
+          if (hasSearch)
+            IconButton(
+              tooltip: 'Effacer',
+              onPressed: onClear,
+              icon: const Icon(Icons.close_rounded, color: AppColors.muted),
+            ),
+          IconButton(
+            tooltip: 'Rechercher',
+            onPressed: onSearch,
+            icon: const Icon(
+              Icons.arrow_forward_rounded,
+              color: AppColors.blue,
+            ),
+          ),
+        ],
+        onSubmitted: (_) => onSearch(),
+      ),
+    );
+  }
+}
+
+class _CatalogHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _CatalogHeaderDelegate({
+    required this.controller,
+    required this.hasSearch,
+    required this.onClear,
+    required this.onSearch,
+    required this.isDesktop,
+    required this.activeCategory,
+    required this.productCount,
+    required this.showProductCount,
+    required this.onOpenCategories,
+  });
+
+  final TextEditingController controller;
+  final bool hasSearch;
+  final VoidCallback onClear;
+  final VoidCallback onSearch;
+  final bool isDesktop;
+  final Category? activeCategory;
+  final int productCount;
+  final bool showProductCount;
+  final VoidCallback onOpenCategories;
+
+  @override
+  double get minExtent => isDesktop ? 68 : 64;
+
+  @override
+  double get maxExtent => isDesktop ? 116 : 112;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    final expansion =
+        (1 - shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0).toDouble();
+    final topPadding = isDesktop ? 12.0 : 10.0;
+    final bottomPadding = (isDesktop ? 12.0 : 10.0) + (2.0 * expansion);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.background.withValues(alpha: 0.96),
+        border: const Border(
+          bottom: BorderSide(color: AppColors.border),
+        ),
+        boxShadow: overlapsContent
+            ? [
+                BoxShadow(
+                  color: AppColors.navy.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : null,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: SizedBox(
+            width: double.infinity,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                topPadding,
+                16,
+                bottomPadding,
+              ),
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 44,
+                    child: _CatalogSearchBar(
+                      controller: controller,
+                      hasSearch: hasSearch,
+                      onClear: onClear,
+                      onSearch: onSearch,
+                    ),
+                  ),
+                  SizedBox(height: 6 * expansion),
+                  ClipRect(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      heightFactor: expansion,
+                      child: Opacity(
+                        opacity: expansion,
+                        child: SizedBox(
+                          height: 40,
+                          child: _CatalogSecondaryRow(
+                            activeCategory: activeCategory,
+                            productCount: productCount,
+                            showProductCount: showProductCount,
+                            onOpenCategories: onOpenCategories,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _CatalogHeaderDelegate oldDelegate) {
+    return controller != oldDelegate.controller ||
+        hasSearch != oldDelegate.hasSearch ||
+        isDesktop != oldDelegate.isDesktop ||
+        activeCategory?.id != oldDelegate.activeCategory?.id ||
+        productCount != oldDelegate.productCount ||
+        showProductCount != oldDelegate.showProductCount;
+  }
+}
+
+class _CatalogSecondaryRow extends StatelessWidget {
+  const _CatalogSecondaryRow({
+    required this.activeCategory,
+    required this.productCount,
+    required this.showProductCount,
+    required this.onOpenCategories,
+  });
+
+  final Category? activeCategory;
+  final int productCount;
+  final bool showProductCount;
+  final VoidCallback onOpenCategories;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Flexible(
+          child: FilledButton.tonalIcon(
+            onPressed: onOpenCategories,
+            icon: const Icon(Icons.grid_view_rounded, size: 16),
+            label: Text(
+              activeCategory?.name ?? 'Catégories',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 38),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              visualDensity: VisualDensity.compact,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+        ),
+        if (showProductCount) ...[
+          const SizedBox(width: 8),
+          InfoPill(
+            icon: Icons.inventory_2_outlined,
+            label: _productCountLabel(productCount),
+            backgroundColor: AppColors.softBlue,
+            foregroundColor: AppColors.blue,
+          ),
+        ],
       ],
-      onSubmitted: (_) => onSearch(),
     );
   }
 }
@@ -795,14 +904,12 @@ class _SmartScrollBackButton extends StatelessWidget {
   }
 }
 
-class _CatalogContent extends StatelessWidget {
-  const _CatalogContent({
+class _CatalogContentSliver extends StatelessWidget {
+  const _CatalogContentSliver({
     required this.loading,
     required this.error,
     required this.products,
-    required this.hasMore,
     required this.loadingMore,
-    required this.scrollController,
     required this.onRetry,
     required this.onOpenProduct,
   });
@@ -810,68 +917,97 @@ class _CatalogContent extends StatelessWidget {
   final bool loading;
   final Object? error;
   final List<Product> products;
-  final bool hasMore;
   final bool loadingMore;
-  final ScrollController scrollController;
   final VoidCallback onRetry;
   final ValueChanged<Product> onOpenProduct;
 
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const ProductGridSkeleton(
-        itemCount: 6,
-        padding: EdgeInsets.only(bottom: 12),
+      return _sliverWithPagePadding(
+        context,
+        const ProductSliverGridSkeleton(),
       );
     }
 
     if (error != null) {
       final friendly = friendlyLoadError(error);
-      return SingleChildScrollView(
-        child: AppStatusPanel(
-          icon: Icons.cloud_off_rounded,
-          title: friendly.title,
-          message: friendly.message,
-          action: OutlinedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Réessayer'),
+      return _sliverWithPagePadding(
+        context,
+        SliverToBoxAdapter(
+          child: AppStatusPanel(
+            icon: Icons.cloud_off_rounded,
+            title: friendly.title,
+            message: friendly.message,
+            action: OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Réessayer'),
+            ),
           ),
         ),
       );
     }
 
     if (products.isEmpty) {
-      return SingleChildScrollView(
-        child: AppStatusPanel(
-          icon: Icons.manage_search_rounded,
-          title: 'Aucun résultat',
-          message:
-              'Aucun produit ne correspond à votre recherche. Essayez avec un autre mot-clé.',
-          action: OutlinedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Actualiser'),
+      return _sliverWithPagePadding(
+        context,
+        SliverToBoxAdapter(
+          child: AppStatusPanel(
+            icon: Icons.manage_search_rounded,
+            title: 'Aucun résultat',
+            message:
+                'Aucun produit ne correspond à votre recherche. Essayez avec un autre mot-clé.',
+            action: OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Actualiser'),
+            ),
           ),
         ),
       );
     }
 
-    return Column(
-      children: [
-        Expanded(
-          child: ResponsiveProductGrid(
+    return _sliverWithPagePadding(
+      context,
+      SliverMainAxisGroup(
+        slivers: [
+          ResponsiveProductSliverGrid(
             products: products,
-            padding: const EdgeInsets.only(bottom: 12),
-            controller: scrollController,
             onProductTap: onOpenProduct,
           ),
-        ),
-        if (loadingMore) ...[
-          const SizedBox(height: 8),
-          const _CatalogLoadingMoreIndicator(),
+          if (loadingMore)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: _CatalogLoadingMoreIndicator(),
+              ),
+            ),
         ],
-      ],
+      ),
+      bottom: 96,
+    );
+  }
+
+  Widget _sliverWithPagePadding(
+    BuildContext context,
+    Widget sliver, {
+    double bottom = 96,
+  }) {
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final pageWidth = constraints.crossAxisExtent > 1120
+            ? 1120.0
+            : constraints.crossAxisExtent;
+        final outer = (constraints.crossAxisExtent - pageWidth) / 2;
+        final horizontal = constraints.crossAxisExtent >= 720 ? 24.0 : 16.0;
+        final inset = outer + horizontal;
+
+        return SliverPadding(
+          padding: EdgeInsets.fromLTRB(inset, 12, inset, bottom),
+          sliver: sliver,
+        );
+      },
     );
   }
 }

@@ -199,7 +199,7 @@ class _Shell extends StatelessWidget {
         left: false,
         right: false,
         bottom: false,
-        child: SizedBox.expand(child: shell),
+        child: shell,
       ),
       bottomNavigationBar: Material(
         color: Theme.of(context).colorScheme.surface,
@@ -214,41 +214,63 @@ class _Shell extends StatelessWidget {
                 top: BorderSide(color: AppColors.border),
               ),
             ),
-            child: NavigationBar(
-              selectedIndex: shell.currentIndex,
-              onDestinationSelected: (index) {
-                shell.goBranch(
-                  index,
-                  initialLocation: index == shell.currentIndex,
-                );
-              },
-              destinations: [
-                const NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home_rounded),
-                  label: 'Accueil',
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.manage_search_rounded),
-                  selectedIcon: Icon(Icons.search_rounded),
-                  label: 'Catalogue',
-                ),
-                const NavigationDestination(
-                  icon: _QuoteNavIcon(selected: false),
-                  selectedIcon: _QuoteNavIcon(selected: true),
-                  label: 'Devis',
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.favorite_border_rounded),
-                  selectedIcon: Icon(Icons.favorite_rounded),
-                  label: 'Favoris',
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.person_outline_rounded),
-                  selectedIcon: Icon(Icons.person_rounded),
-                  label: 'Compte',
-                ),
-              ],
+            child: SizedBox(
+              height: 64,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final navigationBar = NavigationBar(
+                    selectedIndex: shell.currentIndex,
+                    onDestinationSelected: (index) {
+                      shell.goBranch(
+                        index,
+                        initialLocation: index == shell.currentIndex,
+                      );
+                    },
+                    destinations: [
+                      const NavigationDestination(
+                        icon: Icon(Icons.home_outlined),
+                        selectedIcon: Icon(Icons.home_rounded),
+                        label: 'Accueil',
+                      ),
+                      const NavigationDestination(
+                        icon: Icon(Icons.manage_search_rounded),
+                        selectedIcon: Icon(Icons.search_rounded),
+                        label: 'Catalogue',
+                      ),
+                      const NavigationDestination(
+                        icon: _QuoteNavIcon(selected: false),
+                        selectedIcon: _QuoteNavIcon(selected: true),
+                        label: 'Devis',
+                      ),
+                      const NavigationDestination(
+                        icon: Icon(Icons.favorite_border_rounded),
+                        selectedIcon: Icon(Icons.favorite_rounded),
+                        label: 'Favoris',
+                      ),
+                      const NavigationDestination(
+                        icon: Icon(Icons.person_outline_rounded),
+                        selectedIcon: Icon(Icons.person_rounded),
+                        label: 'Compte',
+                      ),
+                    ],
+                  );
+
+                  if (constraints.maxWidth < 800) {
+                    return navigationBar;
+                  }
+
+                  return Align(
+                    alignment: Alignment.bottomCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 620),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: navigationBar,
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ),

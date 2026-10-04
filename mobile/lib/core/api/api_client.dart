@@ -4,8 +4,9 @@ import '../config/app_config.dart';
 import '../storage/token_storage.dart';
 
 class ApiClient {
-  static const String apiBaseUrl = AppConfig.apiBaseUrl;
-  static String resolvePdfUrl(String? rawUrl) => AppConfig.resolvePdfUrl(rawUrl);
+  static String get apiBaseUrl => AppConfig.apiBaseUrl;
+  static String resolvePdfUrl(String? rawUrl) =>
+      AppConfig.resolvePdfUrl(rawUrl);
 
   ApiClient(this._tokenStorage)
       : dio = Dio(

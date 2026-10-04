@@ -1,13 +1,19 @@
 import 'package:flutter/foundation.dart';
 
 class AppConfig {
-  static const String apiBaseUrl =
-      kIsWeb ? '' : 'https://app.heliantha.ma';
   static const productionApiBaseUrl = 'https://app.heliantha.ma';
   static const productionAppBaseUrl = 'https://app.heliantha.ma';
 
+  static const _apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
   static const _appBaseUrlOverride = String.fromEnvironment('APP_BASE_URL');
   static const _isRelease = bool.fromEnvironment('dart.vm.product');
+
+  static String get apiBaseUrl {
+    return _resolveBaseUrl(
+      _apiBaseUrlOverride,
+      defaultValue: kIsWeb ? '' : productionApiBaseUrl,
+    );
+  }
 
   static String get appBaseUrl {
     return _resolveBaseUrl(

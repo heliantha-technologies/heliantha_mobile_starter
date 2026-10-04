@@ -114,6 +114,7 @@ class AddressesScreen extends ConsumerWidget {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(maxWidth: 540),
       builder: (_) => _AddressFormSheet(address: address),
     );
     if (saved == true) {
