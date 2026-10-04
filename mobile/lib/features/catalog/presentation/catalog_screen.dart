@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -355,7 +356,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       body: SafeArea(
         child: CustomScrollView(
           controller: _scrollController,
-          physics: const BouncingScrollPhysics(),
+          // Le rebond reste confortable sur iOS/Android. Sur le Web, le
+          // défilement natif évite l'inertie excessive à la souris/au trackpad.
+          physics: kIsWeb
+              ? const ClampingScrollPhysics()
+              : const BouncingScrollPhysics(),
           slivers: [
             SliverPersistentHeader(
               pinned: true,

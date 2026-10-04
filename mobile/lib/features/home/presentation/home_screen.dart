@@ -13,11 +13,9 @@ import '../../../shared/models/home_slide.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_tokens.dart';
 import '../../../shared/utils/api_url.dart';
-import '../../../shared/utils/friendly_errors.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
-import '../../../shared/widgets/product_grid.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../catalog/providers/catalog_providers.dart';
 import '../../notifications/presentation/notification_bell.dart';
@@ -54,7 +52,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(categoriesProvider);
-    final products = ref.watch(productsProvider);
     final slides = ref.watch(homeSlidesProvider);
     final user = ref.watch(currentUserProvider).valueOrNull;
     final firstname = user?['firstname']?.toString().trim();
@@ -69,7 +66,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           RefreshIndicator(
             onRefresh: () async {
               ref.invalidate(categoriesProvider);
-              ref.invalidate(productsProvider);
               ref.invalidate(homeSlidesProvider);
             },
             child: ListView(
@@ -105,100 +101,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 26),
+                      const SizedBox(height: 18),
+                      // 1. ENCART CTA DEVIS SLIM & PRESTIGE (Marine & Or Translucide)
+                      const _QuotePromoCtaCard(),
+                      const SizedBox(height: 24),
+                      // 2. EN-TÊTE ET GRILLE DYNAMIQUE DES UNIVERS SOLAIRES EN 3 COLONNES
                       AppSectionHeader(
-                        title: 'Catégories',
-                        subtitle: 'Retrouvez les familles produits du site.',
+                        title: 'Nos Univers Solaires',
+                        subtitle: 'Explorez nos équipements par domaine.',
                         actionLabel: 'Voir tout',
-                        onAction: () => context.push('/catalog?categories=1'),
+                        onAction: () => context.go('/catalog'),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       categories.when(
-                        loading: () => const _CategoryRailSkeleton(),
-                        error: (error, __) {
-                          final friendly = friendlyLoadError(error);
-                          return AppStatusPanel(
-                            icon: Icons.wifi_off_rounded,
-                            title: friendly.title,
-                            message: friendly.message,
-                            action: OutlinedButton.icon(
-                              onPressed: () =>
-                                  ref.invalidate(categoriesProvider),
-                              icon: const Icon(Icons.refresh_rounded),
-                              label: const Text('Réessayer'),
-                            ),
-                          );
-                        },
-                        data: (items) => _CategoryRail(
-                          items: items,
-                          onTap: (categoryId) {
-                            context.push('/catalog?category=$categoryId');
-                          },
+                        loading: () => const _SolarCategoriesGridSkeleton(),
+                        error: (_, __) => const _SolarUniverseGrid(
+                          categories: _fallbackSolarCategories,
+                        ),
+                        data: (items) => _SolarUniverseGrid(
+                          categories: items.isNotEmpty
+                              ? items
+                              : _fallbackSolarCategories,
                         ),
                       ),
                       const SizedBox(height: 28),
-                      AppSectionHeader(
-                        title: 'Nos solutions solaires',
-                        subtitle:
-                            'Des équipements sélectionnés pour vos projets.',
-                        actionLabel: 'Catalogue',
-                        onAction: () => context.go('/catalog'),
-                      ),
-                      const SizedBox(height: 12),
-                      products.when(
-                        loading: () => const ProductGridSkeleton(
-                          itemCount: 4,
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                        ),
-                        error: (error, __) {
-                          final friendly = friendlyLoadError(error);
-                          return AppStatusPanel(
-                            icon: Icons.cloud_off_rounded,
-                            title: friendly.title,
-                            message: friendly.message,
-                            action: OutlinedButton.icon(
-                              onPressed: () => ref.invalidate(productsProvider),
-                              icon: const Icon(Icons.refresh_rounded),
-                              label: const Text('Réessayer'),
-                            ),
-                          );
-                        },
-                        data: (items) {
-                          if (items.isEmpty) {
-                            return AppStatusPanel(
-                              icon: Icons.inventory_2_outlined,
-                              title: 'Aucun produit disponible',
-                              message:
-                                  'Notre catalogue sera bientôt mis à jour.',
-                              action: OutlinedButton.icon(
-                                onPressed: () =>
-                                    ref.invalidate(productsProvider),
-                                icon: const Icon(Icons.refresh_rounded),
-                                label: const Text('Actualiser'),
-                              ),
-                            );
-                          }
-
-                          return ResponsiveProductGrid(
-                            products: items,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            onProductTap: (product) {
-                              ref
-                                  .read(catalogRepositoryProvider)
-                                  .rememberProduct(
-                                    product,
-                                  );
-                              context.push(
-                                '/product/${product.id}',
-                                extra: product,
-                              );
-                            },
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 18),
+                      // 3. SUPPORT WHATSAPP EN PIED DE PAGE
                       const _SupportPanel(),
                     ],
                   ),
@@ -946,187 +873,243 @@ class _SlideImageLoading extends StatelessWidget {
   }
 }
 
-class _CategoryRail extends StatelessWidget {
-  const _CategoryRail({
-    required this.items,
-    required this.onTap,
-  });
-
-  final List<Category> items;
-  final ValueChanged<int> onTap;
+class _QuotePromoCtaCard extends StatefulWidget {
+  const _QuotePromoCtaCard();
 
   @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const AppStatusPanel(
-        icon: Icons.category_outlined,
-        title: 'Aucune catégorie',
-        message: 'Nos familles de produits seront bientôt disponibles.',
-      );
-    }
-
-    return SizedBox(
-      height: 112,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 10),
-        itemBuilder: (context, index) {
-          final category = items[index];
-          final accent = _accentFor(index);
-          final soft = _softFor(index);
-          final iconColor = accent == AppColors.sun ? AppColors.navy : accent;
-
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadii.lg),
-              onTap: () => onTap(category.id),
-              child: Container(
-                width: 122,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.surface,
-                      AppColors.surfaceGlow,
-                      Color(0xFFF7FBFD),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(AppRadii.lg),
-                  border: Border.all(color: AppColors.premiumLine),
-                  boxShadow: AppShadows.soft,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: soft,
-                        borderRadius: BorderRadius.circular(AppRadii.md),
-                      ),
-                      child: Icon(
-                        _categoryIcon(category.name),
-                        color: iconColor,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(height: 9),
-                    Text(
-                      category.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w800,
-                            height: 1.15,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  IconData _categoryIcon(String name) {
-    final value = name.toLowerCase();
-
-    if (value.contains('panneau')) {
-      return Icons.solar_power_rounded;
-    }
-    if (value.contains('onduleur')) {
-      return Icons.electric_bolt_rounded;
-    }
-    if (value.contains('batter')) {
-      return Icons.battery_charging_full_rounded;
-    }
-    if (value.contains('pompe') || value.contains('pompage')) {
-      return Icons.water_drop_rounded;
-    }
-    if (value.contains('groupe')) {
-      return Icons.power_rounded;
-    }
-    if (value.contains('protection')) {
-      return Icons.security_rounded;
-    }
-    if (value.contains('monitor')) {
-      return Icons.monitor_heart_outlined;
-    }
-    if (value.contains('éclairage') || value.contains('eclairage')) {
-      return Icons.lightbulb_outline_rounded;
-    }
-
-    return Icons.grid_view_rounded;
-  }
-
-  Color _accentFor(int index) {
-    const colors = [
-      AppColors.blue,
-      AppColors.sun,
-      AppColors.leaf,
-      AppColors.sky,
-    ];
-    return colors[index % colors.length];
-  }
-
-  Color _softFor(int index) {
-    const colors = [
-      AppColors.softBlue,
-      AppColors.softSun,
-      AppColors.softLeaf,
-      Color(0xFFE7F8FB),
-    ];
-    return colors[index % colors.length];
-  }
+  State<_QuotePromoCtaCard> createState() => _QuotePromoCtaCardState();
 }
 
-class _CategoryRailSkeleton extends StatelessWidget {
-  const _CategoryRailSkeleton();
+class _QuotePromoCtaCardState extends State<_QuotePromoCtaCard> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 112,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: 5,
-        separatorBuilder: (context, index) => const SizedBox(width: 10),
-        itemBuilder: (context, index) => DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.surface,
-                AppColors.surfaceGlow,
-                Color(0xFFF7FBFD),
-              ],
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOutCubic,
+      scale: _pressed ? 0.985 : 1.0,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0A192F).withValues(alpha: 0.18),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
             ),
-            borderRadius: BorderRadius.circular(AppRadii.lg),
-            border: Border.all(color: AppColors.premiumLine),
-            boxShadow: AppShadows.soft,
-          ),
-          child: const SizedBox(
-            width: 122,
-            child: Padding(
-              padding: EdgeInsets.all(10),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            BoxShadow(
+              color: const Color(0xFFE5A93C).withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF0A192F).withValues(alpha: 0.92),
+                    const Color(0xFF132F5B).withValues(alpha: 0.86),
+                  ],
+                ),
+                border: Border.all(
+                  color: const Color(0xFFE5A93C).withValues(alpha: 0.38),
+                  width: 1.1,
+                ),
+              ),
+              child: Stack(
                 children: [
-                  _HomeSkeletonBox(width: 42, height: 42),
-                  SizedBox(height: 9),
-                  _HomeSkeletonBox(width: 76, height: 13),
-                  SizedBox(height: 5),
-                  _HomeSkeletonBox(width: 56, height: 13),
+                  Positioned(
+                    top: -24,
+                    right: -20,
+                    child: IgnorePointer(
+                      child: Container(
+                        width: 110,
+                        height: 110,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFFE5A93C).withValues(alpha: 0.20),
+                              const Color(0xFFE5A93C).withValues(alpha: 0.0),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 13,
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 3.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE5A93C)
+                                        .withValues(alpha: 0.16),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: const Color(0xFFE5A93C)
+                                          .withValues(alpha: 0.45),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.auto_awesome_rounded,
+                                        color: Color(0xFFE5A93C),
+                                        size: 11.5,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'ÉTUDE & ESTIMATION OFFERTE',
+                                        style: TextStyle(
+                                          color: Color(0xFFE5A93C),
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.4,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.timer_outlined,
+                                      color: Color(0xFF94A3B8),
+                                      size: 13,
+                                    ),
+                                    SizedBox(width: 3),
+                                    Text(
+                                      '~ 2 min',
+                                      style: TextStyle(
+                                        color: Color(0xFF94A3B8),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 9),
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "Besoin d'un dimensionnement personnalisé ?",
+                                        maxLines: 2,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14.5,
+                                          height: 1.2,
+                                          letterSpacing: -0.2,
+                                        ),
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        'Calculez votre devis en 2 minutes',
+                                        style: TextStyle(
+                                          color: Color(0xFFCBD5E1),
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Material(
+                                  color: Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onHighlightChanged: (val) =>
+                                        setState(() => _pressed = val),
+                                    onTap: () => context.go('/quote'),
+                                    child: Ink(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 13,
+                                        vertical: 9,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFFE5A93C),
+                                            Color(0xFFF59E0B),
+                                          ],
+                                        ),
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFFE5A93C)
+                                                .withValues(alpha: 0.35),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Calculer mon devis',
+                                            style: TextStyle(
+                                              color: Color(0xFF0A192F),
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 12,
+                                              letterSpacing: -0.1,
+                                            ),
+                                          ),
+                                          SizedBox(width: 4),
+                                          Icon(
+                                            Icons.arrow_forward_rounded,
+                                            color: Color(0xFF0A192F),
+                                            size: 14,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1137,24 +1120,327 @@ class _CategoryRailSkeleton extends StatelessWidget {
   }
 }
 
-class _HomeSkeletonBox extends StatelessWidget {
-  const _HomeSkeletonBox({
-    required this.width,
-    required this.height,
+const _fallbackSolarCategories = <Category>[
+  Category(id: 3, name: 'Panneaux solaires'),
+  Category(id: 4, name: 'Onduleurs hybrides'),
+  Category(id: 5, name: 'Pompage solaire'),
+  Category(id: 6, name: 'Batteries lithium'),
+  Category(id: 7, name: 'Groupes électrogènes'),
+  Category(id: 8, name: 'Coffrets de protection'),
+];
+
+class _CategoryVisualMeta {
+  const _CategoryVisualMeta({
+    required this.displayName,
+    required this.icon,
+    required this.gradient,
+    required this.iconColor,
   });
 
-  final double width;
-  final double height;
+  final String displayName;
+  final IconData icon;
+  final List<Color> gradient;
+  final Color iconColor;
+}
+
+_CategoryVisualMeta _getCategoryVisual(Category category) {
+  final rawName = category.name.trim();
+  final lower = rawName.toLowerCase();
+
+  String displayName = rawName;
+  IconData icon = Icons.solar_power_outlined;
+  List<Color> gradient = const [Color(0xFFFEF3C7), Color(0xFFFDE68A)];
+  Color iconColor = const Color(0xFFB45309);
+
+  if (lower.contains('onduleur')) {
+    displayName = 'Onduleurs & Hybrides';
+    icon = Icons.electric_bolt_outlined;
+    gradient = const [Color(0xFFE0E7FF), Color(0xFFC7D2FE)];
+    iconColor = const Color(0xFF3730A3);
+  } else if (lower.contains('panneau')) {
+    displayName = 'Panneaux Solaires';
+    icon = Icons.solar_power_outlined;
+    gradient = const [Color(0xFFFEF3C7), Color(0xFFFCD34D)];
+    iconColor = const Color(0xFFB45309);
+  } else if (lower.contains('off-grid') || lower.contains('off grid')) {
+    displayName = 'Hybride Off-Grid';
+    icon = Icons.power_off_outlined;
+    gradient = const [Color(0xFFEDE9FE), Color(0xFFDDD6FE)];
+    iconColor = const Color(0xFF5B21B6);
+  } else if (lower.contains('on-grid') || lower.contains('on grid')) {
+    displayName = lower.contains('hybride') ? 'Hybride On-Grid' : 'Réseau On-Grid';
+    icon = Icons.sync_alt_rounded;
+    gradient = const [Color(0xFFEDE9FE), Color(0xFFDDD6FE)];
+    iconColor = const Color(0xFF5B21B6);
+  } else if (lower.contains('lithium')) {
+    displayName = 'Batteries Lithium';
+    icon = Icons.battery_saver_rounded;
+    gradient = const [Color(0xFFCCFBF1), Color(0xFF99F6E4)];
+    iconColor = const Color(0xFF0F766E);
+  } else if (lower == 'gel' || lower.contains('batterie gel')) {
+    displayName = 'Batteries Gel';
+    icon = Icons.battery_std_rounded;
+    gradient = const [Color(0xFFCCFBF1), Color(0xFF99F6E4)];
+    iconColor = const Color(0xFF0F766E);
+  } else if (lower.contains('batterie')) {
+    displayName = 'Batteries & Stockage';
+    icon = Icons.battery_charging_full_outlined;
+    gradient = const [Color(0xFFD1FAE5), Color(0xFFA7F3D0)];
+    iconColor = const Color(0xFF065F46);
+  } else if (lower.contains('variateurs et pompes')) {
+    displayName = 'Pompes & Variateurs';
+    icon = Icons.water_drop_outlined;
+    gradient = const [Color(0xFFE0F2FE), Color(0xFFBAE6FD)];
+    iconColor = const Color(0xFF0284C7);
+  } else if (lower.contains('pomp')) {
+    displayName = 'Pompage Solaire';
+    icon = Icons.water_drop_outlined;
+    gradient = const [Color(0xFFE0F2FE), Color(0xFFBAE6FD)];
+    iconColor = const Color(0xFF0284C7);
+  } else if (lower.contains('variateur')) {
+    displayName = 'Variateurs Solaires';
+    icon = Icons.speed_outlined;
+    gradient = const [Color(0xFFE0F2FE), Color(0xFFBAE6FD)];
+    iconColor = const Color(0xFF0284C7);
+  } else if (lower.contains('groupe') || lower.contains('electrogene') || lower.contains('électrogène')) {
+    displayName = lower.contains('maroc') ? 'Groupes Maroc' : 'Groupes Électrogènes';
+    icon = Icons.precision_manufacturing_outlined;
+    gradient = const [Color(0xFFFFEDD5), Color(0xFFFED7AA)];
+    iconColor = const Color(0xFFC2410C);
+  } else if (lower.contains('eclairage') || lower.contains('éclairage')) {
+    displayName = lower.contains('eclairages') ? 'Éclairage Extérieur' : 'Éclairage Solaire';
+    icon = Icons.wb_incandescent_outlined;
+    gradient = const [Color(0xFFFEF9C3), Color(0xFFFEF08A)];
+    iconColor = const Color(0xFFA16207);
+  } else if (lower.contains('monitoring')) {
+    displayName = 'Monitoring & Sécurité';
+    icon = Icons.query_stats_outlined;
+    gradient = const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)];
+    iconColor = const Color(0xFF334155);
+  } else if (lower.contains('gadget') || lower.contains('protection') || lower.contains('outillage') || lower.contains('coffret')) {
+    displayName = 'Coffrets & Protection';
+    icon = Icons.shield_outlined;
+    gradient = const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)];
+    iconColor = const Color(0xFF334155);
+  } else if (lower.contains('goodies')) {
+    displayName = 'Goodies & Cadeaux';
+    icon = Icons.card_giftcard_outlined;
+    gradient = const [Color(0xFFFCE7F3), Color(0xFFFBCFE8)];
+    iconColor = const Color(0xFFBE185D);
+  } else {
+    displayName = rawName.isNotEmpty
+        ? rawName[0].toUpperCase() + rawName.substring(1)
+        : 'Catégorie';
+    icon = Icons.solar_power_outlined;
+  }
+
+  return _CategoryVisualMeta(
+    displayName: displayName,
+    icon: icon,
+    gradient: gradient,
+    iconColor: iconColor,
+  );
+}
+
+class _SolarUniverseGrid extends StatelessWidget {
+  const _SolarUniverseGrid({
+    required this.categories,
+  });
+
+  final List<Category> categories;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(AppRadii.sm),
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: categories.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 0.88,
       ),
+      itemBuilder: (context, index) {
+        final category = categories[index];
+        return _CategoryGlassCard(
+          category: category,
+          onTap: () => context.push('/catalog?category=${category.id}'),
+        );
+      },
+    );
+  }
+}
+
+class _CategoryGlassCard extends StatefulWidget {
+  const _CategoryGlassCard({
+    required this.category,
+    required this.onTap,
+  });
+
+  final Category category;
+  final VoidCallback onTap;
+
+  @override
+  State<_CategoryGlassCard> createState() => _CategoryGlassCardState();
+}
+
+class _CategoryGlassCardState extends State<_CategoryGlassCard> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = _getCategoryVisual(widget.category);
+
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOutCubic,
+      scale: _pressed ? 0.96 : 1.0,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.white.withValues(alpha: 0.70),
+              blurRadius: 1,
+              offset: const Offset(0, -1),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onHighlightChanged: (val) => setState(() => _pressed = val),
+                onTap: widget.onTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.84),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.95),
+                      width: 1.1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: meta.gradient,
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            width: 1.0,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: meta.iconColor.withValues(alpha: 0.16),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Icon(
+                            meta.icon,
+                            size: 22,
+                            color: meta.iconColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              meta.displayName,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              style: const TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                height: 1.16,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SolarCategoriesGridSkeleton extends StatelessWidget {
+  const _SolarCategoriesGridSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 6,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 0.88,
+      ),
+      itemBuilder: (context, index) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  width: 1.1,
+                ),
+              ),
+              child: Center(
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFE2E8F0).withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1199,39 +1485,49 @@ class _SupportPanelState extends State<_SupportPanel> {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         scale: _hovered ? 1.005 : 1,
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadii.lg),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.lg),
-            onTap: _openWhatsApp,
-            splashColor: Colors.white.withValues(alpha: 0.08),
-            highlightColor: Colors.white.withValues(alpha: 0.05),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.navy, AppColors.slate],
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0A192F).withValues(
+                  alpha: _hovered ? 0.20 : 0.12,
                 ),
-                borderRadius: BorderRadius.circular(AppRadii.lg),
-                border: Border.all(
-                  color: _hovered ? AppColors.sun : AppColors.premiumLine,
-                  width: _hovered ? 1.25 : 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.navy.withValues(
-                      alpha: _hovered ? 0.18 : 0.12,
-                    ),
-                    blurRadius: _hovered ? 20 : 14,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
+                blurRadius: _hovered ? 20 : 14,
+                offset: const Offset(0, 8),
               ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: _openWhatsApp,
+                  splashColor: Colors.white.withValues(alpha: 0.08),
+                  highlightColor: Colors.white.withValues(alpha: 0.05),
+                  child: Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFF0A192F).withValues(alpha: 0.90),
+                          const Color(0xFF132F5B).withValues(alpha: 0.85),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _hovered
+                            ? const Color(0xFF25D366).withValues(alpha: 0.60)
+                            : Colors.white.withValues(alpha: 0.15),
+                        width: 1.1,
+                      ),
+                    ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final compact = constraints.maxWidth < 520;
@@ -1275,8 +1571,11 @@ class _SupportPanelState extends State<_SupportPanel> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+),
+);
+}
 }
 
 class _SupportIcon extends StatelessWidget {
