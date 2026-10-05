@@ -1,3 +1,4 @@
+import json
 import logging
 
 import httpx
@@ -5,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.api.deps import get_bridge_client, get_checkout_service
-from app.clients.bridge import BridgeHTTPError, BridgeUnavailable, PrestaShopBridgeClient
 from app.clients.bridge import (
     BridgeHTTPError,
     BridgeUnavailable,
@@ -16,6 +16,7 @@ from app.core.config import Settings, get_settings
 from app.core.security import decode_access_token
 from app.schemas.checkout import CheckoutConfirmIn, CheckoutPreviewIn
 from app.services.checkout import CheckoutService
+from app.services.normalizers import unwrap_collection
 
 router = APIRouter(tags=["checkout"])
 optional_bearer = HTTPBearer(auto_error=False)
@@ -98,6 +99,83 @@ def _safe_confirm_log(body: dict) -> dict:
         "carrier_id": body.get("carrier_id"),
         "payment_module": body.get("payment_module"),
         "has_idempotency_key": bool(body.get("idempotency_key")),
+    }
+
+
+def _checkout_resource_row(raw: object, resource: str, resource_id: int) -> dict:
+    if isinstance(raw, dict):
+        row = raw.get(resource[:-1], raw)
+        if isinstance(row, dict) and str(row.get("id")) == str(resource_id):
+            return row
+        for row in unwrap_collection(raw, resource):
+            if str(row.get("id")) == str(resource_id):
+                return row
+    raise HTTPException(502, "Nous n’avons pas pu retrouver la confirmation. Veuillez réessayer.")
+
+
+async def _resume_duplicate_checkout(
+    exc: BridgeHTTPError,
+    body: dict,
+    service: CheckoutService,
+) -> dict | None:
+    """Resume the bridge's durable key/order lookup without writing to PrestaShop."""
+    if exc.status_code != 409:
+        return None
+    try:
+        response = json.loads(exc.body or "{}")
+    except (TypeError, ValueError):
+        return None
+    error = response.get("error") if isinstance(response, dict) else None
+    if not isinstance(error, dict):
+        return None
+    if (error.get("code") or exc.code) != "DUPLICATE_CHECKOUT":
+        return None
+    try:
+        order_id = int(error.get("order_id") or 0)
+    except (TypeError, ValueError):
+        return None
+    if order_id <= 0:
+        return None
+
+    # The order ID comes from the private bridge, never from the caller.
+    raw = await service.ps.get_resource("orders", order_id)
+    order = _checkout_resource_row(raw, "orders", order_id)
+    customer_id = int(order.get("id_customer") or 0)
+    if body.get("customer_id"):
+        belongs_to_customer = customer_id == int(body["customer_id"])
+    else:
+        guest_email = str((body.get("guest") or {}).get("email") or "").strip().casefold()
+        belongs_to_customer = False
+        if guest_email and customer_id > 0:
+            raw_customer = await service.ps.get_resource("customers", customer_id)
+            customer = _checkout_resource_row(raw_customer, "customers", customer_id)
+            belongs_to_customer = (
+                isinstance(customer, dict)
+                and str(customer.get("is_guest")) in {"1", "True"}
+                and str(customer.get("email") or "").strip().casefold() == guest_email
+            )
+    if not belongs_to_customer:
+        raise HTTPException(403, "Cette confirmation ne correspond pas à votre commande.")
+    reference = str(order.get("reference") or "").strip()
+    if not reference:
+        raise HTTPException(502, "La référence de votre commande est momentanément indisponible. Veuillez réessayer.")
+
+    confirmation = {
+        "status": "success",
+        "order_id": order_id,
+        "reference": reference,
+        "is_duplicate_safe": True,
+        "message": "Commande confirmée",
+        "total": float(order.get("total_paid_tax_incl") or order.get("total_paid") or 0),
+        "payment_module": order.get("module"),
+    }
+    logger.info("Idempotent checkout hit: order %s returned safely", reference)
+    return {
+        **confirmation,
+        "success": True,
+        "data": confirmation,
+        "meta": None,
+        "error": None,
     }
 
 
@@ -205,6 +283,12 @@ async def checkout_confirm(
     except BridgeUnavailable as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
     except BridgeHTTPError as exc:
+        try:
+            resumed = await _resume_duplicate_checkout(exc, body, service)
+        except Exception as recovery_error:
+            raise _handle_checkout_exception(recovery_error, "confirm recovery") from recovery_error
+        if resumed is not None:
+            return resumed
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as exc:
         raise _handle_checkout_exception(exc, "confirm") from exc

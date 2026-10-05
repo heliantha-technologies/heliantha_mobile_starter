@@ -455,6 +455,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
                 selectedPumpCv: _existingPumpCv,
                 downloadingPdf: _downloadingPdf,
                 onDownloadPdf: _downloadPdf,
+                onContactAdvisor: _contactQuoteAdvisor,
                 onRestart: _restartEstimate,
               ),
             ],
@@ -774,21 +775,13 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
           suffixIcon: phoneValid
-              ? IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFECFDF5),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check_rounded,
-                      size: 16,
-                      color: Color(0xFF059669),
-                    ),
+              ? const Padding(
+                  padding: EdgeInsets.only(right: 14),
+                  child: Icon(
+                    Icons.check_circle_rounded,
+                    size: 20,
+                    color: Color(0xFF059669),
                   ),
-                  tooltip: 'Passer à la Ville',
-                  onPressed: () => _cityFocus.requestFocus(),
                 )
               : const Padding(
                   padding: EdgeInsets.only(right: 14),
@@ -995,6 +988,32 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     }
   }
 
+  Future<void> _contactQuoteAdvisor() async {
+    final result = _result;
+    if (result == null) return;
+    final amount = result.totalTtc;
+    final message = 'Bonjour HeliAntha, je viens de générer mon devis n° '
+        '${result.quoteNumber ?? 'à confirmer'} '
+        '(Puissance : ${result.powerKwc?.toStringAsFixed(2) ?? 'à confirmer'} kWc, '
+        'Montant : ${amount == null ? 'à confirmer' : formatMoney(amount, currency: 'MAD', includeCurrency: false)} DH). '
+        'Je souhaite échanger avec un conseiller technique pour concrétiser mon installation.';
+    HapticFeedback.lightImpact();
+    try {
+      final opened = await launchUrl(
+        Uri.parse('https://wa.me/${AppConfig.supportWhatsAppNumber}'
+            '?text=${Uri.encodeComponent(message)}'),
+        mode: LaunchMode.externalApplication,
+      );
+      if (opened) return;
+    } catch (_) {
+      // Keep the official number accessible if the app cannot be opened.
+    }
+    if (mounted) {
+      AppFeedback.info(context,
+          '${AppConfig.supportWhatsAppDisplay} : notre équipe reste à votre écoute pour concrétiser votre installation solaire.');
+    }
+  }
+
   Future<void> _downloadPdf() async {
     final quoteNumber = _result?.quoteNumber;
     final resolvedUrl = _result?.resolvedPdfUrl ??
@@ -1144,7 +1163,8 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     if (country.dialCode == '+212') {
       return RegExp(r'^[5-8]\d{8}$').hasMatch(digits);
     }
-    return digits.length >= 6 && digits.length <= 13;
+    // Numéros internationaux : au moins 8 chiffres pour éviter une validation prématurée dès 6 chiffres
+    return digits.length >= 8 && digits.length <= 13;
   }
 
   Future<void> _showCountryPickerModal() async {
@@ -1647,6 +1667,7 @@ class _QuoteResultCard extends StatefulWidget {
     required this.selectedPumpCv,
     required this.downloadingPdf,
     required this.onDownloadPdf,
+    required this.onContactAdvisor,
     required this.onRestart,
   });
 
@@ -1655,6 +1676,7 @@ class _QuoteResultCard extends StatefulWidget {
   final double? selectedPumpCv;
   final bool downloadingPdf;
   final VoidCallback onDownloadPdf;
+  final VoidCallback onContactAdvisor;
   final VoidCallback onRestart;
 
   @override
@@ -1790,83 +1812,85 @@ class _QuoteResultCardState extends State<_QuoteResultCard>
         ),
         const SizedBox(height: 20),
         _TactilePressScale(
-          enabled: quoteNumber != null && !widget.downloadingPdf,
+          enabled: true,
           child: Container(
-            height: 56,
+            constraints: const BoxConstraints(minHeight: 52),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(18),
               gradient: const LinearGradient(
-                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                colors: [Color(0xFF25D366), Color(0xFF1EBE5D)],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.35),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
+                  color: const Color(0xFF1EBE5D).withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(22),
-                onTap: quoteNumber == null || widget.downloadingPdf
-                    ? null
-                    : widget.onDownloadPdf,
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (widget.downloadingPdf) ...[
-                        const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Flexible(
-                          child: Text(
-                            'Génération en cours...',
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                      ] else ...[
-                        const Icon(
-                          Icons.picture_as_pdf_rounded,
-                          color: Color(0xFFF59E0B),
-                          size: 22,
-                        ),
-                        const SizedBox(width: 10),
-                        const Flexible(
-                          child: Text(
-                            'Télécharger mon Devis Officiel (PDF)',
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                key: const ValueKey('quote-whatsapp-action'),
+                borderRadius: BorderRadius.circular(18),
+                onTap: widget.onContactAdvisor,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(children: [
+                    Icon(Icons.chat_rounded,
+                        color: Color(0xFF0B2239), size: 24),
+                    SizedBox(width: 12),
+                    Expanded(
+                        child: Text(
+                      'Échanger avec un conseiller sur WhatsApp',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Color(0xFF0B2239),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15),
+                    )),
+                  ]),
                 ),
               ),
             ),
           ),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton(
+          key: const ValueKey('quote-pdf-action'),
+          onPressed: result.resolvedPdfUrl.isEmpty || widget.downloadingPdf
+              ? null
+              : widget.onDownloadPdf,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: const Color(0xFF0B2239),
+            foregroundColor: Colors.white,
+            minimumSize: const Size(48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            side: BorderSide(
+                color: const Color(0xFFF4C33D).withValues(alpha: 0.3)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          ),
+          child: Row(children: [
+            if (widget.downloadingPdf)
+              const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.2, color: Color(0xFFF4C33D)),
+              )
+            else
+              const Icon(Icons.picture_as_pdf_rounded,
+                  color: Color(0xFFF4C33D), size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Text(
+              widget.downloadingPdf
+                  ? 'Génération en cours...'
+                  : 'Télécharger mon Devis Officiel (PDF)',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+            )),
+          ]),
         ),
         const SizedBox(height: 10),
         _TactilePressScale(
@@ -1966,7 +1990,10 @@ class _TotalPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 12,
+            runSpacing: 8,
             children: [
               Container(
                 padding:
@@ -1987,30 +2014,29 @@ class _TotalPanel extends StatelessWidget {
                       size: 14,
                     ),
                     SizedBox(width: 5),
-                    Text(
-                      'Devis validé',
-                      style: TextStyle(
-                        color: Color(0xFFA7F3D0),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11,
+                    Flexible(
+                      child: Text(
+                        'Devis validé',
+                        style: TextStyle(
+                          color: Color(0xFFA7F3D0),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const Spacer(),
               if (quoteNumber != null)
-                Flexible(
-                  child: Text(
-                    quoteNumber!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.65),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 11.5,
-                    ),
+                Text(
+                  quoteNumber!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11.5,
                   ),
                 ),
             ],
@@ -2821,7 +2847,7 @@ const _kCountryDials = <_CountryDial>[
     isoCode: 'MA',
     dialCode: '+212',
     flag: '🇲🇦',
-    hint: '06 12 34 56 78',
+    hint: '07xxxxxxxxxx',
   ),
   _CountryDial(
     name: 'France',

@@ -1,23 +1,41 @@
+import 'dart:async';
+
 import '../../../core/api/api_client.dart';
 import '../../../shared/models/category.dart';
 import '../../../shared/models/product.dart';
 
+class CatalogPage {
+  const CatalogPage({
+    required this.items,
+    required this.page,
+    required this.hasMore,
+  });
+
+  final List<Product> items;
+  final int page;
+  // Null is reserved for older API envelopes used by list-only consumers.
+  final bool? hasMore;
+}
+
 class CatalogRepository {
   CatalogRepository(this._api);
   final ApiClient _api;
-  final Map<String, _CacheEntry<List<Product>>> _productsCache = {};
+  final Map<String, _CacheEntry<CatalogPage>> _productsCache = {};
+  final Map<String, Future<CatalogPage>> _pendingProducts = {};
   final Map<String, _CacheEntry<Product>> _productCache = {};
   final Set<String> _loadedProductDetails = {};
-  _CacheEntry<List<Category>>? _categoriesCache;
+  final Map<String, _CacheEntry<List<Category>>> _categoriesCache = {};
 
   static const _cacheTtl = Duration(seconds: 45);
   static const _detailCacheTtl = Duration(minutes: 2);
   static const _categoriesCacheTtl = Duration(minutes: 5);
+  static const _maxCachedPages = 128;
 
   Future<List<Category>> categories({
     int? languageId,
   }) async {
-    final cached = _categoriesCache;
+    final key = 'categories_${languageId ?? 'default'}';
+    final cached = _categoriesCache[key];
     if (cached != null && cached.isFresh) {
       return cached.value;
     }
@@ -31,7 +49,7 @@ class CatalogRepository {
     final data = response.data['data'] as List<dynamic>? ?? [];
     final rows =
         data.whereType<Map<String, dynamic>>().map(Category.fromJson).toList();
-    _categoriesCache = _CacheEntry(
+    _categoriesCache[key] = _CacheEntry(
       rows,
       DateTime.now().add(_categoriesCacheTtl),
     );
@@ -40,11 +58,52 @@ class CatalogRepository {
 
   Future<List<Product>> products({
     int page = 1,
-    int pageSize = 20,
+    int pageSize = 30,
     int? category,
     String? query,
     int? languageId,
     int? currencyId,
+  }) async {
+    return (await _productsPage(
+      page: page,
+      pageSize: pageSize,
+      category: category,
+      query: query,
+      languageId: languageId,
+      currencyId: currencyId,
+    ))
+        .items;
+  }
+
+  Future<CatalogPage> productsPage({
+    int page = 1,
+    int pageSize = 30,
+    int? category,
+    String? query,
+    int? languageId,
+    int? currencyId,
+  }) async {
+    final result = await _productsPage(
+      page: page,
+      pageSize: pageSize,
+      category: category,
+      query: query,
+      languageId: languageId,
+      currencyId: currencyId,
+    );
+    if (result.hasMore == null) {
+      throw const FormatException('Missing catalogue pagination metadata');
+    }
+    return result;
+  }
+
+  Future<CatalogPage> _productsPage({
+    required int page,
+    required int pageSize,
+    required int? category,
+    required String? query,
+    required int? languageId,
+    required int? currencyId,
   }) async {
     final key = _productsKey(
       page: page,
@@ -59,6 +118,36 @@ class CatalogRepository {
       return cached.value;
     }
 
+    final pending = _pendingProducts[key];
+    if (pending != null) {
+      return pending;
+    }
+    final request = _fetchProductsPage(
+      key: key,
+      page: page,
+      pageSize: pageSize,
+      category: category,
+      query: query,
+      languageId: languageId,
+      currencyId: currencyId,
+    );
+    _pendingProducts[key] = request;
+    try {
+      return await request;
+    } finally {
+      _pendingProducts.remove(key);
+    }
+  }
+
+  Future<CatalogPage> _fetchProductsPage({
+    required String key,
+    required int page,
+    required int pageSize,
+    required int? category,
+    required String? query,
+    required int? languageId,
+    required int? currencyId,
+  }) async {
     final response = await _api.dio.get(
       '/v1/products',
       queryParameters: {
@@ -70,11 +159,22 @@ class CatalogRepository {
         if (currencyId != null) 'currency_id': currencyId,
       },
     );
-    final data = response.data['data'] as List<dynamic>? ?? [];
+    final body = Map<String, dynamic>.from(response.data as Map);
+    final meta = body['meta'] as Map?;
+    final data = (body['items'] ?? body['data']) as List<dynamic>? ?? [];
     final rows =
         data.whereType<Map<String, dynamic>>().map(Product.fromJson).toList();
+    final result = CatalogPage(
+      items: rows,
+      page: ((body['page'] ?? meta?['page']) as num?)?.toInt() ?? page,
+      hasMore: (body['has_more'] ?? meta?['has_more']) as bool?,
+    );
+    _productsCache.removeWhere((_, entry) => !entry.isFresh);
+    if (_productsCache.length >= _maxCachedPages) {
+      _productsCache.remove(_productsCache.keys.first);
+    }
     _productsCache[key] = _CacheEntry(
-      rows,
+      result,
       DateTime.now().add(_cacheTtl),
     );
     for (final product in rows) {
@@ -86,12 +186,12 @@ class CatalogRepository {
         );
       }
     }
-    return rows;
+    return result;
   }
 
   void prefetchProducts({
     int page = 1,
-    int pageSize = 20,
+    int pageSize = 30,
     int? category,
     String? query,
     int? languageId,
@@ -109,14 +209,16 @@ class CatalogRepository {
     if (cached != null && cached.isFresh) {
       return;
     }
-    products(
+    unawaited(_productsPage(
       page: page,
       pageSize: pageSize,
       category: category,
       query: query,
       languageId: languageId,
       currencyId: currencyId,
-    );
+    ).then<void>((_) {}, onError: (Object _, StackTrace __) {
+      // Prefetch is optional. A foreground request can retry after an error.
+    }));
   }
 
   Future<Product> product(
@@ -153,7 +255,8 @@ class CatalogRepository {
   }
 
   void rememberProduct(Product product, {int? languageId, int? currencyId}) {
-    final key = _productKey(product.id, languageId, currencyId ?? product.currencyId);
+    final key =
+        _productKey(product.id, languageId, currencyId ?? product.currencyId);
     if (_loadedProductDetails.contains(key)) {
       return;
     }

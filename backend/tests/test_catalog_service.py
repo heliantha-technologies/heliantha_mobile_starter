@@ -72,7 +72,7 @@ class FakePrestaShopClient:
                 int(item)
                 for item in filters["id"].strip("[]").split("|")
                 if item
-            }
+            } if filters and "id" in filters else None
             products = [
                 {
                     "id": "101",
@@ -99,11 +99,15 @@ class FakePrestaShopClient:
                     "description_short": "",
                 },
             ]
-            return {
-                "products": [
-                    product for product in products if int(product["id"]) in ids
-                ]
-            }
+            rows = [
+                product for product in products
+                if ids is None or int(product["id"]) in ids
+            ]
+            rows.sort(key=lambda row: int(row["id"]), reverse=True)
+            if limit:
+                offset, count = map(int, limit.split(","))
+                rows = rows[offset:offset + count]
+            return {"products": rows}
 
         if resource == "stock_availables":
             return {
@@ -177,10 +181,7 @@ class FakePrestaShopClient:
 
 
 def clear_catalog_cache():
-    CatalogService._category_rows_cache = {}
-    CatalogService._category_product_ids_cache = {}
-    CatalogService._products_cache = {}
-    CatalogService._product_detail_cache = {}
+    CatalogService.clear_memory_caches()
 
 
 async def test_parent_category_includes_descendant_products():
@@ -242,7 +243,7 @@ async def test_categories_hide_root_and_home():
     assert [category.id for category in categories] == [9, 26, 27]
 
 
-async def test_search_uses_prestashop_search_resource():
+async def test_search_uses_full_product_resource_instead_of_capped_autocomplete():
     clear_catalog_cache()
     ps = FakePrestaShopClient()
     service = CatalogService(ps, DummySettings())
@@ -256,14 +257,9 @@ async def test_search_uses_prestashop_search_resource():
 
     assert meta["returned"] == 2
     assert [product.id for product in products] == [102, 101]
-    assert (
-        "search",
-        "search",
-        {
-            "query": "batterie",
-            "language": 3,
-        },
-    ) in ps.calls
+    assert ("list", "products", {"active": "[1]"}) in ps.calls
+    assert not any(call[0] == "search" for call in ps.calls)
+    assert meta["has_more"] is False
 
 
 async def test_search_filters_irrelevant_native_results():

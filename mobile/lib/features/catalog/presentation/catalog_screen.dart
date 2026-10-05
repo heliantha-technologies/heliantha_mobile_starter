@@ -49,6 +49,14 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   Timer? _searchDebounce;
   bool _openedCategoriesFromRoute = false;
   bool _showSmartScrollButton = false;
+  String? _lastInputQuery;
+  bool _searchPending = false;
+  ({
+    String? query,
+    int? category,
+    int? languageId,
+    int? currencyId
+  })? _activeSearch;
 
   bool get _hasSearch => _search.text.trim().isNotEmpty;
   int? get _categoryFilter => widget.initialCategory;
@@ -61,6 +69,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   void initState() {
     super.initState();
     _search = TextEditingController(text: widget.initialQuery ?? '');
+    _lastInputQuery = _queryFilter;
     _scrollController = ScrollController();
     _search.addListener(_onSearchChanged);
     _scrollController.addListener(_onCatalogScroll);
@@ -102,9 +111,16 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   void _onSearchChanged() {
-    if (mounted) {
-      setState(() {});
+    if (_lastInputQuery == _queryFilter) {
+      return;
     }
+    _lastInputQuery = _queryFilter;
+    // Invalidate immediately, including during the debounce window.
+    ++_currentSearchRequestId;
+    setState(() {
+      _searchPending = true;
+      _loadingMore = false;
+    });
     _searchDebounce?.cancel();
     _searchDebounce = Timer(
       const Duration(milliseconds: 350),
@@ -154,6 +170,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
           !_hasMore ||
+          _searchPending ||
           _loading ||
           _loadingMore ||
           !_scrollController.hasClients) {
@@ -188,7 +205,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   Future<void> _loadFirstPage() async {
     _searchDebounce?.cancel();
     final requestId = ++_currentSearchRequestId;
+    final query = _queryFilter;
+    final category = _categoryFilter;
     setState(() {
+      _searchPending = false;
+      _activeSearch = null;
       _loading = true;
       _loadingMore = false;
       _error = null;
@@ -200,11 +221,20 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     try {
       final repo = ref.read(catalogRepositoryProvider);
       final selection = await _storeSelection();
-      final rows = await repo.products(
+      if (!mounted || requestId != _currentSearchRequestId) {
+        return;
+      }
+      final search = (
+        query: query,
+        category: category,
+        languageId: selection.languageId,
+        currencyId: selection.currencyId,
+      );
+      final result = await repo.productsPage(
         page: 1,
         pageSize: _pageSize,
-        category: _categoryFilter,
-        query: _queryFilter,
+        category: search.category,
+        query: search.query,
         languageId: selection.languageId,
         currencyId: selection.currencyId,
       );
@@ -213,17 +243,18 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           return;
         }
         setState(() {
-          _products = rows;
-          _page = 1;
-          _hasMore = rows.length == _pageSize;
+          _activeSearch = search;
+          _products = result.items;
+          _page = result.page;
+          _hasMore = result.hasMore == true;
         });
         _loadMoreIfContentIsShort();
         if (_hasMore) {
           repo.prefetchProducts(
             page: 2,
             pageSize: _pageSize,
-            category: _categoryFilter,
-            query: _queryFilter,
+            category: search.category,
+            query: search.query,
             languageId: selection.languageId,
             currencyId: selection.currencyId,
           );
@@ -241,7 +272,12 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_loadingMore || _loading || !_hasMore) {
+    final search = _activeSearch;
+    if (_searchPending ||
+        _loadingMore ||
+        _loading ||
+        !_hasMore ||
+        search == null) {
       return;
     }
 
@@ -249,21 +285,25 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     setState(() => _loadingMore = true);
     try {
       final repo = ref.read(catalogRepositoryProvider);
-      final selection = await _storeSelection();
       final nextPage = _page + 1;
-      final rows = await repo.products(
+      final result = await repo.productsPage(
         page: nextPage,
         pageSize: _pageSize,
-        category: _categoryFilter,
-        query: _queryFilter,
-        languageId: selection.languageId,
-        currencyId: selection.currencyId,
+        category: search.category,
+        query: search.query,
+        languageId: search.languageId,
+        currencyId: search.currencyId,
       );
       if (mounted && requestId == _currentSearchRequestId) {
         setState(() {
-          _products = [...?_products, ...rows];
-          _page = nextPage;
-          _hasMore = rows.length == _pageSize;
+          final existingIds =
+              _products?.map((product) => product.id).toSet() ?? {};
+          _products = [
+            ...?_products,
+            ...result.items.where((product) => existingIds.add(product.id)),
+          ];
+          _page = result.page;
+          _hasMore = result.hasMore == true;
         });
         _loadMoreIfContentIsShort();
       }

@@ -95,7 +95,7 @@ async def categories(
 @router.get("/products", response_model=dict)
 async def products(
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
+    page_size: int = Query(default=30, ge=1, le=100),
     category: int | None = Query(default=None, ge=1),
     q: str | None = Query(default=None, max_length=120),
     language_id: int | None = Query(default=None, ge=1),
@@ -119,9 +119,14 @@ async def products(
             catalog.ps,
             cache=str(meta.get("cache", "")),
         )
+        items = [x.model_dump() for x in rows]
         return {
             "success": True,
-            "data": [x.model_dump() for x in rows],
+            "items": items,
+            "page": meta["page"],
+            "has_more": meta["has_more"],
+            # Preserve the existing envelope for other catalogue consumers.
+            "data": items,
             "meta": meta,
             "error": None,
         }

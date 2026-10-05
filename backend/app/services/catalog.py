@@ -13,6 +13,7 @@ from app.schemas.product import (
 )
 from app.schemas.store import CurrencyOut
 from app.services.store_context import StoreContextService
+from app.services.catalog_search import normalize_catalog_search
 from app.services.normalizers import (
     localized,
     to_bool,
@@ -48,9 +49,17 @@ PRODUCT_STALE_TTL_SECONDS = 30
 PRODUCT_DETAIL_CACHE_TTL_SECONDS = 20
 HIDDEN_CATEGORY_IDS = {1, 2}
 PRODUCT_ID_BATCH_SIZE = 80
+SEARCH_INDEX_DISPLAY = "[id,name,reference,description_short]"
+SEARCH_INDEX_BATCH_SIZE = 100
+SEARCH_INDEX_TTL_SECONDS = 60
+SEARCH_INDEX_MAX_ENTRIES = 8
+PRODUCT_CACHE_MAX_ENTRIES = 256
 
 
 class CatalogService:
+    _search_index_cache: dict[
+        tuple[str, int], tuple[float, list[tuple[int, str]]]
+    ] = {}
     _category_rows_cache: dict[int, tuple[float, list[dict[str, Any]]]] = {}
     _category_product_ids_cache: dict[int, tuple[float, list[int]]] = {}
     _products_cache: dict[
@@ -77,6 +86,7 @@ class CatalogService:
 
     @classmethod
     def clear_memory_caches(cls) -> None:
+        cls._search_index_cache.clear()
         cls._category_rows_cache.clear()
         cls._category_product_ids_cache.clear()
         cls._products_cache.clear()
@@ -139,7 +149,7 @@ class CatalogService:
         self,
         *,
         page: int = 1,
-        page_size: int = 20,
+        page_size: int = 30,
         category_id: int | None = None,
         q: str | None = None,
         language_id: int | None = None,
@@ -147,7 +157,7 @@ class CatalogService:
     ) -> tuple[list[ProductOut], dict[str, Any]]:
 
         effective_language_id = self._language_id(language_id)
-        query = q.strip() if q and q.strip() else None
+        query = normalize_catalog_search(q) if q and q.strip() else None
         cache_key = self._products_cache_key(
             page=page,
             page_size=page_size,
@@ -209,7 +219,7 @@ class CatalogService:
                 "products",
                 display=PRODUCT_LIST_DISPLAY,
                 filters=filters,
-                limit=f"{offset},{page_size}",
+                limit=f"{offset},{page_size + 1}",
                 sort="[id_DESC]",
                 params={"language": effective_language_id},
             )
@@ -218,6 +228,8 @@ class CatalogService:
                 payload,
                 "products",
             )
+            has_more = len(rows) > page_size
+            rows = rows[:page_size]
 
             stock_by_product = await self._stock_for_products(
                 [to_int(row.get("id")) for row in rows],
@@ -243,6 +255,7 @@ class CatalogService:
                     "page": page,
                     "page_size": page_size,
                     "returned": len(products),
+                    "has_more": has_more,
                 },
                 PRODUCT_CACHE_TTL_SECONDS,
             )
@@ -361,6 +374,8 @@ class CatalogService:
                 "page": page,
                 "page_size": page_size,
                 "returned": 0,
+                "has_more": False,
+                "total": 0,
             }
 
         rows = await self._product_rows_for_ids(
@@ -393,6 +408,8 @@ class CatalogService:
             "page": page,
             "page_size": page_size,
             "returned": len(products),
+            "has_more": offset + page_size < len(rows),
+            "total": len(rows),
         }
 
     async def _products_for_search(
@@ -440,16 +457,13 @@ class CatalogService:
                 "page": page,
                 "page_size": page_size,
                 "returned": 0,
+                "has_more": False,
+                "total": 0,
             }
 
         rows = await self._product_rows_for_ids(
-            product_ids,
+            product_ids[offset: offset + page_size],
             language_id=language_id,
-        )
-        rows = self._filter_rows_matching_query(
-            rows,
-            query,
-            language_id,
         )
 
         by_id = {
@@ -458,11 +472,11 @@ class CatalogService:
         }
         ordered_rows = [
             by_id[product_id]
-            for product_id in product_ids
+            for product_id in product_ids[offset: offset + page_size]
             if product_id in by_id
         ]
 
-        page_rows = ordered_rows[offset: offset + page_size]
+        page_rows = ordered_rows
         stock_by_product = await self._stock_for_products(
             [to_int(row.get("id")) for row in page_rows],
         )
@@ -482,6 +496,8 @@ class CatalogService:
             "page": page,
             "page_size": page_size,
             "returned": len(products),
+            "has_more": offset + page_size < len(product_ids),
+            "total": len(product_ids),
         }
 
     async def _search_product_ids(
@@ -491,71 +507,60 @@ class CatalogService:
         language_id: int,
     ) -> list[int]:
 
-        payload = await self.ps.search(
-            query=query,
-            language_id=language_id,
-        )
-
-        rows = unwrap_collection(payload, "products")
-
-        if not rows and isinstance(payload, dict):
-            products = payload.get("product")
-            if isinstance(products, list):
-                rows = [
-                    row for row in products
-                    if isinstance(row, dict)
-                ]
-            elif isinstance(products, dict):
-                rows = [products]
-
-        product_ids: list[int] = []
-        seen: set[int] = set()
-
-        for row in rows:
-            product_id = (
-                to_int(row.get("id_product"))
-                or to_int(row.get("id"))
-            )
-
-            if not product_id or product_id in seen:
-                continue
-
-            seen.add(product_id)
-            product_ids.append(product_id)
-
-        return product_ids
-
-    def _filter_rows_matching_query(
-        self,
-        rows: list[dict[str, Any]],
-        query: str,
-        language_id: int,
-    ) -> list[dict[str, Any]]:
-
-        terms = [
-            term.lower()
-            for term in query.replace("-", " ").split()
-            if term.strip()
+        terms = normalize_catalog_search(query).split()
+        index = await self._search_index(language_id)
+        return [
+            product_id
+            for product_id, text in index
+            if all(term in text for term in terms)
         ]
 
-        if not terms:
-            return rows
+    async def _search_index(self, language_id: int) -> list[tuple[int, str]]:
+        # PrestaShop's /search is an autocomplete resource capped at ten hits.
+        # Read all active products through the standard paginated webservice;
+        # no bridge changes or writes to the shop are needed.
+        store = str(getattr(self.settings, "prestashop_base_url", ""))
+        key = (store, language_id)
+        cached = self.__class__._search_index_cache.get(key)
+        if cached and cached[0] > monotonic():
+            return cached[1]
 
-        filtered: list[dict[str, Any]] = []
+        async def _fetch() -> list[tuple[int, str]]:
+            cached_inner = self.__class__._search_index_cache.get(key)
+            if cached_inner and cached_inner[0] > monotonic():
+                return cached_inner[1]
+            documents: dict[int, str] = {}
+            offset = 0
+            while True:
+                payload = await self.ps.list_resource(
+                    "products",
+                    display=SEARCH_INDEX_DISPLAY,
+                    filters={"active": "[1]"},
+                    limit=f"{offset},{SEARCH_INDEX_BATCH_SIZE}",
+                    sort="[id_DESC]",
+                    params={"language": language_id},
+                )
+                rows = unwrap_collection(payload, "products")
+                for row in rows:
+                    product_id = to_int(row.get("id"))
+                    if product_id:
+                        documents[product_id] = normalize_catalog_search(" ".join([
+                            localized(row.get("name"), language_id),
+                            str(row.get("reference") or ""),
+                            localized(row.get("description_short"), language_id),
+                        ]))
+                if len(rows) < SEARCH_INDEX_BATCH_SIZE:
+                    break
+                offset += len(rows)
+            index = sorted(documents.items(), reverse=True)
+            cache = self.__class__._search_index_cache
+            if len(cache) >= SEARCH_INDEX_MAX_ENTRIES and key not in cache:
+                cache.pop(min(cache, key=lambda item: cache[item][0]))
+            # Publish only a complete index: a failed scan is never cached.
+            cache[key] = (monotonic() + SEARCH_INDEX_TTL_SECONDS, index)
+            return index
 
-        for row in rows:
-            haystack = " ".join(
-                [
-                    localized(row.get("name"), language_id),
-                    str(row.get("reference") or ""),
-                    localized(row.get("description_short"), language_id),
-                ]
-            ).lower()
-
-            if all(term in haystack for term in terms):
-                filtered.append(row)
-
-        return filtered
+        return await single_flight.execute(f"catalog-search-index:{key}", _fetch)
 
     async def _active_category_rows(
         self,
@@ -1218,6 +1223,11 @@ class CatalogService:
         output_meta = dict(meta)
         output_meta["cache"] = "miss"
         now = monotonic()
+        cache = self.__class__._products_cache
+        for expired_key in [key for key, entry in cache.items() if entry[1] <= now]:
+            cache.pop(expired_key, None)
+        if len(cache) >= PRODUCT_CACHE_MAX_ENTRIES and key not in cache:
+            cache.pop(min(cache, key=lambda item: cache[item][0]))
         self.__class__._products_cache[key] = (
             now + ttl_seconds,
             now + PRODUCT_STALE_TTL_SECONDS,

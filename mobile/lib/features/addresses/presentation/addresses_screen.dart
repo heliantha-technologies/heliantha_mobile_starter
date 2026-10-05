@@ -53,15 +53,19 @@ class AddressesScreen extends ConsumerWidget {
                 ),
               );
             },
-            data: (_) => _GuestAddressesPanel(
-              onLogin: () => context.push(
-                loginLocationFor(
-                  from == 'checkout'
-                      ? '/addresses?from=checkout'
-                      : '/addresses',
+            data: (_) {
+              final destination = from == 'checkout'
+                  ? '/addresses?from=checkout'
+                  : '/addresses';
+              return _GuestAddressesPanel(
+                onLogin: () => context.push(
+                  loginLocationFor(destination),
                 ),
-              ),
-            ),
+                onRegister: () => context.push(
+                  '/register?redirect=${Uri.encodeComponent(destination)}',
+                ),
+              );
+            },
           ),
         ),
       );
@@ -171,9 +175,13 @@ class AddressesScreen extends ConsumerWidget {
 }
 
 class _GuestAddressesPanel extends StatelessWidget {
-  const _GuestAddressesPanel({required this.onLogin});
+  const _GuestAddressesPanel({
+    required this.onLogin,
+    this.onRegister,
+  });
 
   final VoidCallback onLogin;
+  final VoidCallback? onRegister;
 
   @override
   Widget build(BuildContext context) {
@@ -208,21 +216,106 @@ class _GuestAddressesPanel extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                     ),
               ),
-              const SizedBox(height: 10),
-              const Text(
-                'Connectez-vous pour retrouver vos adresses et faciliter '
-                'la livraison de vos prochains équipements solaires.',
+              const SizedBox(height: 8),
+              Text(
+                'Connectez-vous pour gérer votre carnet d’adresses et faciliter '
+                'la livraison de vos équipements solaires partout au Maroc.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.muted,
+                      height: 1.4,
+                    ),
               ),
               const SizedBox(height: 20),
+              const _AddressBenefitRow(
+                icon: Icons.local_shipping_outlined,
+                title: 'Livraison partout au Maroc',
+                subtitle:
+                    'Chantier, domicile ou entreprise : enregistrez plusieurs adresses selon vos besoins.',
+              ),
+              const SizedBox(height: 12),
+              const _AddressBenefitRow(
+                icon: Icons.receipt_long_outlined,
+                title: 'Facturation distincte',
+                subtitle:
+                    'Distinguez facilement l’adresse de livraison de l’adresse de facturation de votre structure.',
+              ),
+              const SizedBox(height: 12),
+              const _AddressBenefitRow(
+                icon: Icons.bolt_rounded,
+                title: 'Commande rapide en 1 clic',
+                subtitle:
+                    'Vos coordonnées et instructions de livraison sont pré-remplies en toute sécurité.',
+              ),
+              const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: onLogin,
                 icon: const Icon(Icons.login_rounded),
                 label: const Text('Se connecter'),
               ),
+              if (onRegister != null) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: onRegister,
+                  icon: const Icon(Icons.person_add_alt_1_rounded),
+                  label: const Text('Créer mon compte client'),
+                ),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AddressBenefitRow extends StatelessWidget {
+  const _AddressBenefitRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceMuted,
+            borderRadius: BorderRadius.circular(AppRadii.sm),
+          ),
+          child: Icon(icon, size: 20, color: AppColors.navy),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.muted,
+                      height: 1.35,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

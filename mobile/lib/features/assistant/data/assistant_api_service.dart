@@ -126,6 +126,9 @@ class AssistantApiService {
     } on TimeoutException {
       return 'Votre conseiller HeliAntha prend un instant de plus pour affiner son analyse. N’hésitez pas à relancer votre question, nous sommes à votre entière disposition.';
     } on DioException catch (dioError) {
+      if (dioError.response?.statusCode == 429) {
+        return 'Vous avez beaucoup échangé avec notre conseiller solaire. Merci de patienter quelques instants avant de poursuivre votre conversation.';
+      }
       if (dioError.type == DioExceptionType.connectionTimeout ||
           dioError.type == DioExceptionType.receiveTimeout ||
           dioError.type == DioExceptionType.sendTimeout) {

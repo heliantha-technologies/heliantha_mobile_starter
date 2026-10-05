@@ -7,6 +7,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/router/navigation_helpers.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_tokens.dart';
+import '../../../shared/utils/friendly_errors.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
@@ -28,7 +29,21 @@ class AccountScreen extends ConsumerWidget {
       ),
       body: user.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const _GuestView(),
+        error: (error, _) {
+          final friendly = friendlyLoadError(error);
+          return ResponsivePagePadding(
+            child: AppStatusPanel(
+              icon: Icons.cloud_off_rounded,
+              title: friendly.title,
+              message: friendly.message,
+              action: OutlinedButton.icon(
+                onPressed: () => ref.invalidate(currentUserProvider),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Réessayer'),
+              ),
+            ),
+          );
+        },
         data: (data) {
           if (data == null) {
             return const _GuestView();
