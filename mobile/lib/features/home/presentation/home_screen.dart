@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
@@ -31,16 +32,26 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  static bool _welcomeShownThisSession = false;
+  static const _welcomeSeenKey = 'has_seen_welcome_splash';
 
   bool _showWelcome = false;
 
   @override
   void initState() {
     super.initState();
-    if (!_welcomeShownThisSession) {
-      _welcomeShownThisSession = true;
-      _showWelcome = true;
+    unawaited(_showWelcomeIfNeeded());
+  }
+
+  Future<void> _showWelcomeIfNeeded() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      if (!mounted || preferences.getBool(_welcomeSeenKey) == true) {
+        return;
+      }
+      setState(() => _showWelcome = true);
+      await preferences.setBool(_welcomeSeenKey, true);
+    } catch (_) {
+      // L'accueil reste accessible même si le stockage local est indisponible.
     }
   }
 
@@ -210,13 +221,14 @@ class _WelcomeSplashOverlayState extends State<_WelcomeSplashOverlay>
   late final Animation<double> _scale;
   late final Animation<double> _textFade;
   late final Animation<double> _sheen;
+  bool _dismissing = false;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2350),
+      duration: const Duration(milliseconds: 1350),
     );
     _fade = TweenSequence<double>([
       TweenSequenceItem(
@@ -263,11 +275,11 @@ class _WelcomeSplashOverlayState extends State<_WelcomeSplashOverlay>
   }
 
   void _dismiss() {
-    _controller.animateTo(
-      1,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-    );
+    if (_dismissing) {
+      return;
+    }
+    _controller.stop();
+    setState(() => _dismissing = true);
   }
 
   @override
@@ -275,32 +287,43 @@ class _WelcomeSplashOverlayState extends State<_WelcomeSplashOverlay>
     final title = widget.firstname == null
         ? 'Marhaba 👋'
         : 'Marhaba ${widget.firstname} 👋';
+    final subtitle = widget.firstname == null
+        ? 'Bienvenue chez HeliAntha'
+        : 'Heureux de vous retrouver ✨';
 
     return Positioned.fill(
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: _dismiss,
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Opacity(
-              opacity: _fade.value,
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 2.2, sigmaY: 2.2),
-                child: ColoredBox(
-                  color: AppColors.ink.withValues(alpha: 0.08),
-                  child: Center(
-                    child: Transform.scale(
-                      scale: _scale.value,
-                      child: child,
+      child: AnimatedOpacity(
+        key: const ValueKey('home-welcome-overlay'),
+        opacity: _dismissing ? 0 : 1,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOutCubic,
+        onEnd: () {
+          if (_dismissing) {
+            widget.onDismissed();
+          }
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _dismiss,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return Opacity(
+                opacity: _fade.value,
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 2.2, sigmaY: 2.2),
+                  child: ColoredBox(
+                    color: AppColors.ink.withValues(alpha: 0.08),
+                    child: Center(
+                      child: Transform.scale(
+                        scale: _scale.value,
+                        child: child,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
-          child: GestureDetector(
-            onTap: () {},
+              );
+            },
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 320),
               child: Container(
@@ -351,7 +374,7 @@ class _WelcomeSplashOverlayState extends State<_WelcomeSplashOverlay>
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Bienvenue sur Heliantha',
+                            subtitle,
                             textAlign: TextAlign.center,
                             style: Theme.of(context)
                                 .textTheme
@@ -360,16 +383,6 @@ class _WelcomeSplashOverlayState extends State<_WelcomeSplashOverlay>
                                   color: AppColors.navy,
                                   fontWeight: FontWeight.w800,
                                 ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Heureux de vous retrouver ✨',
-                            textAlign: TextAlign.center,
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppColors.muted,
-                                      fontWeight: FontWeight.w700,
-                                    ),
                           ),
                         ],
                       ),

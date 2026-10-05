@@ -8,6 +8,7 @@ import 'package:heliantha_mobile/features/home/presentation/home_screen.dart';
 import 'package:heliantha_mobile/features/home/providers/home_provider.dart';
 import 'package:heliantha_mobile/shared/models/category.dart';
 import 'package:heliantha_mobile/shared/models/home_slide.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> _mountNavigationHome(WidgetTester tester, GoRouter router,
     {bool settleAttention = true}) async {
@@ -74,6 +75,10 @@ Future<void> _tapLabel(WidgetTester tester, String label) async {
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({
+        'has_seen_welcome_splash': true,
+      }));
+
   testWidgets(
       'HomeScreen renders CTA Devis Marine & Or et les 6 Univers Solaires en 3 colonnes',
       (tester) async {
