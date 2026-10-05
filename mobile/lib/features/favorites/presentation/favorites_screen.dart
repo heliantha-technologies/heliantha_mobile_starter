@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -127,7 +128,10 @@ class _FavoriteProductTile extends ConsumerWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              _FavoriteImage(imageUrl: product.imageUrl),
+              _FavoriteImage(
+                key: ValueKey('favorite-product-image-${product.id}'),
+                imageUrl: product.imageUrl,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -195,35 +199,63 @@ class _FavoriteShell extends StatelessWidget {
 }
 
 class _FavoriteImage extends StatelessWidget {
-  const _FavoriteImage({required this.imageUrl});
+  const _FavoriteImage({super.key, required this.imageUrl});
 
   final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
+    final url = absoluteApiUrl(imageUrl);
     return Container(
       width: 72,
       height: 72,
       padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadii.md),
       ),
-      child: imageUrl == null
-          ? const Icon(Icons.solar_power_rounded, color: AppColors.blue)
+      child: url.isEmpty
+          ? const _FavoriteImagePlaceholder()
           : ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: CachedNetworkImage(
-                imageUrl: absoluteApiUrl(imageUrl),
-                fit: BoxFit.contain,
-                fadeInDuration: const Duration(milliseconds: 180),
-                fadeOutDuration: const Duration(milliseconds: 100),
-                placeholder: (_, __) => const _FavoriteImagePlaceholder(),
-                errorWidget: (_, __, ___) => const Icon(
-                  Icons.solar_power_rounded,
-                  color: AppColors.blue,
-                ),
-              ),
+              child: kIsWeb
+                  ? Image.network(
+                      url,
+                      width: double.infinity,
+                      height: double.infinity,
+                      cacheWidth: 400,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.medium,
+                      headers: const {'Accept': 'image/*'},
+                      frameBuilder: (_, child, frame, wasSynchronouslyLoaded) {
+                        if (wasSynchronouslyLoaded) return child;
+                        return AnimatedOpacity(
+                          opacity: frame == null ? 0 : 1,
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          child: child,
+                        );
+                      },
+                      loadingBuilder: (_, child, progress) => progress == null
+                          ? child
+                          : const _FavoriteImagePlaceholder(),
+                      errorBuilder: (_, __, ___) =>
+                          const _FavoriteImagePlaceholder(),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: url,
+                      httpHeaders: const {'Accept': 'image/*'},
+                      width: double.infinity,
+                      height: double.infinity,
+                      memCacheWidth: 200,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.medium,
+                      fadeInDuration: const Duration(milliseconds: 180),
+                      fadeOutDuration: const Duration(milliseconds: 100),
+                      placeholder: (_, __) => const _FavoriteImagePlaceholder(),
+                      errorWidget: (_, __, ___) =>
+                          const _FavoriteImagePlaceholder(),
+                    ),
             ),
     );
   }

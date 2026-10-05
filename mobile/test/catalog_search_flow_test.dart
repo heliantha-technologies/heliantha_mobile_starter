@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:heliantha_mobile/core/api/api_client.dart';
 import 'package:heliantha_mobile/core/storage/token_storage.dart';
 import 'package:heliantha_mobile/features/catalog/data/catalog_repository.dart';
@@ -68,7 +69,8 @@ Product _product(int id) => Product(
       available: true,
     );
 
-Future<void> _mount(WidgetTester tester, _FakeRepository repository) async {
+Future<void> _mount(WidgetTester tester, _FakeRepository repository,
+    {Widget? app}) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(414, 896);
   tester.view.devicePixelRatio = 1;
@@ -85,7 +87,7 @@ Future<void> _mount(WidgetTester tester, _FakeRepository repository) async {
             currencies: [],
           )),
     ],
-    child: const MaterialApp(home: CatalogScreen()),
+    child: app ?? const MaterialApp(home: CatalogScreen()),
   ));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 10));
@@ -117,6 +119,39 @@ ApiClient _api(
 }
 
 void main() {
+  testWidgets('Category route can reopen the picker after dismissal',
+      (tester) async {
+    final repository = _FakeRepository();
+    final router = GoRouter(
+      initialLocation: '/catalog?categories=1',
+      routes: [
+        GoRoute(
+          path: '/catalog',
+          builder: (_, state) => CatalogScreen(
+            openCategories: state.uri.queryParameters['categories'] == '1',
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _mount(tester, repository,
+        app: MaterialApp.router(routerConfig: router));
+    repository.requests.single.complete([]);
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+
+    Navigator.of(tester.element(find.byType(BottomSheet))).pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+
+    router.go('/catalog?categories=1');
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    Navigator.of(tester.element(find.byType(BottomSheet))).pop();
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('Typing invalidates a response before the 350ms debounce expires',
       (tester) async {
     final repository = _FakeRepository();

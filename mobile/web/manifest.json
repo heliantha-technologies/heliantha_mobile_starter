@@ -1,11 +1,11 @@
 {
-    "name": "heliantha_mobile",
-    "short_name": "heliantha_mobile",
+    "name": "HeliAntha Solaire Maroc",
+    "short_name": "HeliAntha",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Application officielle HeliAntha Solaire - Étude, Dimensionnement et Matériel Solaire au Maroc",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

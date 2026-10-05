@@ -127,12 +127,14 @@ class _QuoteGeneratingOverlayState extends State<QuoteGeneratingOverlay>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   ExcludeSemantics(
-                                    child: Transform.rotate(
-                                      angle: _controller.value * 20 * math.pi,
-                                      child: const Icon(
-                                        Icons.wb_sunny_rounded,
-                                        size: 48,
-                                        color: _gold,
+                                    child: SizedBox(
+                                      width: 96,
+                                      height: 96,
+                                      child: CustomPaint(
+                                        painter: _SunPainter(
+                                          spin: _controller.value * 12,
+                                          pulse: (math.sin(_controller.value * 32 * math.pi) + 1) / 2,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -195,4 +197,112 @@ class _QuoteGeneratingOverlayState extends State<QuoteGeneratingOverlay>
       ),
     );
   }
+}
+
+/// Soleil vectoriel : halo, rayons en rotation, cœur dégradé qui pulse et
+/// petit satellite bleu (l'énergie) en orbite.
+class _SunPainter extends CustomPainter {
+  const _SunPainter({required this.spin, required this.pulse});
+
+  final double spin;
+  final double pulse;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide / 2;
+    final coreRadius = radius * (0.34 + 0.025 * pulse);
+
+    // Halo doux
+    canvas.drawCircle(
+      center,
+      radius * (0.78 + 0.06 * pulse),
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFDE68A).withValues(alpha: 0.55),
+            const Color(0xFFFDE68A).withValues(alpha: 0),
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: radius)),
+    );
+
+    // Orbite pointillée
+    final orbitRadius = radius * 0.86;
+    final orbitPaint = Paint()
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.35)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    const dashCount = 36;
+    for (var i = 0; i < dashCount; i += 2) {
+      final a0 = (i / dashCount) * 2 * math.pi;
+      final a1 = ((i + 1) / dashCount) * 2 * math.pi;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: orbitRadius),
+        a0,
+        a1 - a0,
+        false,
+        orbitPaint,
+      );
+    }
+
+    // Rayons solaires dorés
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(spin * 2 * math.pi);
+    const rayCount = 12;
+    for (var i = 0; i < rayCount; i++) {
+      final isLong = i.isEven;
+      final inner = coreRadius + radius * 0.08;
+      final outer = coreRadius +
+          radius * (isLong ? 0.32 : 0.22) +
+          (isLong ? radius * 0.03 * pulse : 0);
+      final rayPaint = Paint()
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = isLong ? 4.2 : 3
+        ..color = (isLong ? const Color(0xFFF59E0B) : const Color(0xFFFBBF24))
+            .withValues(alpha: isLong ? 0.95 : 0.75);
+      final angle = (i / rayCount) * 2 * math.pi;
+      final dir = Offset(math.cos(angle), math.sin(angle));
+      canvas.drawLine(dir * inner, dir * outer, rayPaint);
+    }
+    canvas.restore();
+
+    // Cœur du soleil avec dégradé et lueur
+    final coreRect = Rect.fromCircle(center: center, radius: coreRadius);
+    canvas.drawCircle(
+      center,
+      coreRadius + 2,
+      Paint()
+        ..color = const Color(0xFFF59E0B).withValues(alpha: 0.35)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+    );
+    canvas.drawCircle(
+      center,
+      coreRadius,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.35, -0.35),
+          colors: [Color(0xFFFFF7CC), Color(0xFFFCD34D), Color(0xFFF59E0B)],
+          stops: [0, 0.45, 1],
+        ).createShader(coreRect),
+    );
+
+    // Satellite d'énergie en orbite (rotation orbitale dynamique)
+    final satAngle = -spin * 2 * math.pi * 2 - math.pi / 2;
+    final satPos = center +
+        Offset(math.cos(satAngle), math.sin(satAngle)) * orbitRadius;
+    canvas.drawCircle(
+      satPos,
+      7,
+      Paint()
+        ..color = const Color(0xFF38BDF8).withValues(alpha: 0.45)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
+    canvas.drawCircle(satPos, 4.5, Paint()..color = const Color(0xFF0EA5E9));
+    canvas.drawCircle(satPos, 1.8, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(_SunPainter oldDelegate) =>
+      oldDelegate.spin != spin || oldDelegate.pulse != pulse;
 }

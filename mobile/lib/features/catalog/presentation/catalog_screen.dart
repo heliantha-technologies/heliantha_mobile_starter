@@ -332,6 +332,14 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       return;
     }
     _openedCategoriesFromRoute = true;
+    // Consume this navigation action so a later visit can open the picker again.
+    final route = GoRouterState.of(context).uri;
+    final params = Map<String, String>.of(route.queryParameters)
+      ..remove('categories');
+    context.go(Uri(
+      path: route.path,
+      queryParameters: params.isEmpty ? null : params,
+    ).toString());
     _openCategoryPicker();
   }
 

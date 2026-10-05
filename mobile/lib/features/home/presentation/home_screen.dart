@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -78,19 +79,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _SearchSurface(
-                        onSubmitted: (value) {
-                          final query = value.trim();
-                          if (query.isEmpty) {
-                            context.go('/catalog');
-                            return;
-                          }
-                          context.push(
-                            '/catalog?q=${Uri.encodeQueryComponent(query)}',
-                          );
-                        },
-                        onFilter: () => context.go('/catalog'),
-                      ),
+                      const _QuoteUsageShortcuts(),
                       const SizedBox(height: 16),
                       slides.when(
                         loading: () => const _HomeSliderLoading(),
@@ -106,23 +95,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       // 1. ENCART CTA DEVIS SLIM & PRESTIGE (Marine & Or Translucide)
                       const _QuotePromoCtaCard(),
                       const SizedBox(height: 24),
-                      // 2. EN-TÊTE ET GRILLE DYNAMIQUE DES UNIVERS SOLAIRES EN 3 COLONNES
+                      // Six univers principaux, indépendants des sous-catégories.
                       AppSectionHeader(
                         title: 'Nos Univers Solaires',
                         subtitle: 'Explorez nos équipements par domaine.',
                         actionLabel: 'Voir tout',
-                        onAction: () => context.go('/catalog'),
+                        onAction: () => context.go('/catalog?categories=1'),
                       ),
                       const SizedBox(height: 14),
                       categories.when(
                         loading: () => const _SolarCategoriesGridSkeleton(),
                         error: (_, __) => const _SolarUniverseGrid(
-                          categories: _fallbackSolarCategories,
+                          categories: [],
                         ),
                         data: (items) => _SolarUniverseGrid(
-                          categories: items.isNotEmpty
-                              ? items
-                              : _fallbackSolarCategories,
+                          categories: items,
                         ),
                       ),
                       const SizedBox(height: 28),
@@ -139,6 +126,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               firstname: firstname?.isNotEmpty == true ? firstname : null,
               onDismissed: _dismissWelcome,
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuoteUsageShortcuts extends StatelessWidget {
+  const _QuoteUsageShortcuts();
+
+  static const _shortcuts = [
+    (label: '🌾 Pompage Agricole', projectType: 'pompage'),
+    (label: '🔋 Solaire avec batteries', projectType: 'hybride'),
+    (label: '📉 Réduire ma facture', projectType: 'autoconsommation'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(20);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var index = 0; index < _shortcuts.length; index++) ...[
+            if (index > 0) const SizedBox(width: 8),
+            Semantics(
+              button: true,
+              child: Material(
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: borderRadius,
+                  side: const BorderSide(color: AppColors.border),
+                ),
+                child: InkWell(
+                  borderRadius: borderRadius,
+                  onTap: () => context.push(
+                    '/quote/form/${_shortcuts[index].projectType}',
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        _shortcuts[index].label,
+                        style: const TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -404,32 +449,6 @@ class _WelcomeLogo extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SearchSurface extends StatelessWidget {
-  const _SearchSurface({
-    required this.onSubmitted,
-    required this.onFilter,
-  });
-
-  final ValueChanged<String> onSubmitted;
-  final VoidCallback onFilter;
-
-  @override
-  Widget build(BuildContext context) {
-    return SearchBar(
-      hintText: 'Rechercher un produit...',
-      leading: const Icon(Icons.search_rounded, color: AppColors.muted),
-      trailing: [
-        IconButton(
-          tooltip: 'Filtres',
-          onPressed: onFilter,
-          icon: const Icon(Icons.tune_rounded, color: AppColors.blue),
-        ),
-      ],
-      onSubmitted: onSubmitted,
     );
   }
 }
@@ -881,375 +900,358 @@ class _QuotePromoCtaCard extends StatefulWidget {
   State<_QuotePromoCtaCard> createState() => _QuotePromoCtaCardState();
 }
 
-class _QuotePromoCtaCardState extends State<_QuotePromoCtaCard> {
+class _QuotePromoCtaCardState extends State<_QuotePromoCtaCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _attentionController;
   bool _pressed = false;
 
   @override
+  void initState() {
+    super.initState();
+    _attentionController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 30),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _attentionController.value = 1;
+    } else if (_attentionController.isDismissed) {
+      _attentionController.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _attentionController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return AnimatedScale(
-      duration: const Duration(milliseconds: 140),
-      curve: Curves.easeOutCubic,
-      scale: _pressed ? 0.985 : 1.0,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0A192F).withValues(alpha: 0.18),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-            BoxShadow(
-              color: const Color(0xFFE5A93C).withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF0A192F).withValues(alpha: 0.92),
-                    const Color(0xFF132F5B).withValues(alpha: 0.86),
-                  ],
+    return AnimatedBuilder(
+      animation: _attentionController,
+      builder: (context, _) {
+        // Fifteen gentle pulses over thirty seconds, then a steady banner.
+        final pulse = _attentionController.isCompleted
+            ? 0.0
+            : (1 - math.cos(_attentionController.value * math.pi * 30)) / 2;
+        return AnimatedScale(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          scale: _pressed ? 0.985 : 1.0,
+          child: Container(
+            key: const ValueKey('home-quote-promo'),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0A192F).withValues(alpha: 0.18),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
                 ),
-                border: Border.all(
-                  color: const Color(0xFFE5A93C).withValues(alpha: 0.38),
-                  width: 1.1,
+                BoxShadow(
+                  color: const Color(0xFFE5A93C)
+                      .withValues(alpha: 0.08 + pulse * 0.24),
+                  blurRadius: 10 + pulse * 10,
+                  spreadRadius: pulse,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    top: -24,
-                    right: -20,
-                    child: IgnorePointer(
-                      child: Container(
-                        width: 110,
-                        height: 110,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              const Color(0xFFE5A93C).withValues(alpha: 0.20),
-                              const Color(0xFFE5A93C).withValues(alpha: 0.0),
-                            ],
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Container(
+                  key: const ValueKey('home-quote-promo-surface'),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF0A192F).withValues(alpha: 0.92),
+                        const Color(0xFF132F5B).withValues(alpha: 0.86),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFFE5A93C)
+                          .withValues(alpha: 0.38 + pulse * 0.57),
+                      width: 1.1,
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        top: -24,
+                        right: -20,
+                        child: IgnorePointer(
+                          child: Container(
+                            width: 110,
+                            height: 110,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  const Color(0xFFE5A93C)
+                                      .withValues(alpha: 0.20),
+                                  const Color(0xFFE5A93C)
+                                      .withValues(alpha: 0.0),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 13,
-                    ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onHighlightChanged: (val) =>
+                              setState(() => _pressed = val),
+                          onTap: () => context.go('/quote'),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            child: Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 9,
-                                    vertical: 3.5,
-                                  ),
+                                  width: 38,
+                                  height: 38,
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFE5A93C)
                                         .withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(999),
+                                    borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: const Color(0xFFE5A93C)
-                                          .withValues(alpha: 0.45),
-                                      width: 0.8,
+                                          .withValues(alpha: 0.35),
                                     ),
                                   ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.auto_awesome_rounded,
-                                        color: Color(0xFFE5A93C),
-                                        size: 11.5,
-                                      ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'ÉTUDE & ESTIMATION OFFERTE',
-                                        style: TextStyle(
-                                          color: Color(0xFFE5A93C),
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.4,
-                                        ),
-                                      ),
-                                    ],
+                                  child: const Icon(
+                                    Icons.auto_awesome_rounded,
+                                    color: Color(0xFFE5A93C),
+                                    size: 22,
                                   ),
                                 ),
-                                const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.timer_outlined,
-                                      color: Color(0xFF94A3B8),
-                                      size: 13,
-                                    ),
-                                    SizedBox(width: 3),
-                                    Text(
-                                      '~ 2 min',
-                                      style: TextStyle(
-                                        color: Color(0xFF94A3B8),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 9),
-                            Row(
-                              children: [
+                                const SizedBox(width: 12),
                                 const Expanded(
                                   child: Column(
+                                    mainAxisSize: MainAxisSize.min,
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        "Besoin d'un dimensionnement personnalisé ?",
-                                        maxLines: 2,
+                                        'Étude & dimensionnement',
                                         style: TextStyle(
                                           color: Colors.white,
+                                          fontSize: 14,
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 14.5,
-                                          height: 1.2,
-                                          letterSpacing: -0.2,
+                                          height: 1.25,
                                         ),
                                       ),
-                                      SizedBox(height: 2),
-                                      Text(
-                                        'Calculez votre devis en 2 minutes',
-                                        style: TextStyle(
-                                          color: Color(0xFFCBD5E1),
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Material(
-                                  color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(12),
-                                    onHighlightChanged: (val) =>
-                                        setState(() => _pressed = val),
-                                    onTap: () => context.go('/quote'),
-                                    child: Ink(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 13,
-                                        vertical: 9,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            Color(0xFFE5A93C),
-                                            Color(0xFFF59E0B),
-                                          ],
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: const Color(0xFFE5A93C)
-                                                .withValues(alpha: 0.35),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 3),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                      SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 4,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
                                         children: [
                                           Text(
                                             'Calculer mon devis',
                                             style: TextStyle(
-                                              color: Color(0xFF0A192F),
-                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFFE5A93C),
                                               fontSize: 12,
-                                              letterSpacing: -0.1,
+                                              fontWeight: FontWeight.w800,
                                             ),
                                           ),
-                                          SizedBox(width: 4),
-                                          Icon(
-                                            Icons.arrow_forward_rounded,
-                                            color: Color(0xFF0A192F),
-                                            size: 14,
+                                          Text(
+                                            'Offert · 2 min',
+                                            style: TextStyle(
+                                              color: Color(0xFFCBD5E1),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                           ),
                                         ],
                                       ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFFE5A93C),
+                                        Color(0xFFF59E0B),
+                                      ],
                                     ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_forward_rounded,
+                                    color: Color(0xFF0A192F),
+                                    size: 18,
                                   ),
                                 ),
                               ],
                             ),
-                          ],
-                        );
-                      },
-                    ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-const _fallbackSolarCategories = <Category>[
-  Category(id: 3, name: 'Panneaux solaires'),
-  Category(id: 4, name: 'Onduleurs hybrides'),
-  Category(id: 5, name: 'Pompage solaire'),
-  Category(id: 6, name: 'Batteries lithium'),
-  Category(id: 7, name: 'Groupes électrogènes'),
-  Category(id: 8, name: 'Coffrets de protection'),
-];
-
-class _CategoryVisualMeta {
-  const _CategoryVisualMeta({
+class _SolarUniverse {
+  const _SolarUniverse({
     required this.displayName,
     required this.icon,
     required this.gradient,
     required this.iconColor,
+    required this.categoryNames,
+    required this.query,
   });
 
   final String displayName;
   final IconData icon;
   final List<Color> gradient;
   final Color iconColor;
-}
+  final List<String> categoryNames;
+  final String query;
 
-_CategoryVisualMeta _getCategoryVisual(Category category) {
-  final rawName = category.name.trim();
-  final lower = rawName.toLowerCase();
-
-  String displayName = rawName;
-  IconData icon = Icons.solar_power_outlined;
-  List<Color> gradient = const [Color(0xFFFEF3C7), Color(0xFFFDE68A)];
-  Color iconColor = const Color(0xFFB45309);
-
-  if (lower.contains('onduleur')) {
-    displayName = 'Onduleurs & Hybrides';
-    icon = Icons.electric_bolt_outlined;
-    gradient = const [Color(0xFFE0E7FF), Color(0xFFC7D2FE)];
-    iconColor = const Color(0xFF3730A3);
-  } else if (lower.contains('panneau')) {
-    displayName = 'Panneaux Solaires';
-    icon = Icons.solar_power_outlined;
-    gradient = const [Color(0xFFFEF3C7), Color(0xFFFCD34D)];
-    iconColor = const Color(0xFFB45309);
-  } else if (lower.contains('off-grid') || lower.contains('off grid')) {
-    displayName = 'Hybride Off-Grid';
-    icon = Icons.power_off_outlined;
-    gradient = const [Color(0xFFEDE9FE), Color(0xFFDDD6FE)];
-    iconColor = const Color(0xFF5B21B6);
-  } else if (lower.contains('on-grid') || lower.contains('on grid')) {
-    displayName =
-        lower.contains('hybride') ? 'Hybride On-Grid' : 'Réseau On-Grid';
-    icon = Icons.sync_alt_rounded;
-    gradient = const [Color(0xFFEDE9FE), Color(0xFFDDD6FE)];
-    iconColor = const Color(0xFF5B21B6);
-  } else if (lower.contains('lithium')) {
-    displayName = 'Batteries Lithium';
-    icon = Icons.battery_saver_rounded;
-    gradient = const [Color(0xFFCCFBF1), Color(0xFF99F6E4)];
-    iconColor = const Color(0xFF0F766E);
-  } else if (lower == 'gel' || lower.contains('batterie gel')) {
-    displayName = 'Batteries Gel';
-    icon = Icons.battery_std_rounded;
-    gradient = const [Color(0xFFCCFBF1), Color(0xFF99F6E4)];
-    iconColor = const Color(0xFF0F766E);
-  } else if (lower.contains('batterie')) {
-    displayName = 'Batteries & Stockage';
-    icon = Icons.battery_charging_full_outlined;
-    gradient = const [Color(0xFFD1FAE5), Color(0xFFA7F3D0)];
-    iconColor = const Color(0xFF065F46);
-  } else if (lower.contains('variateurs et pompes')) {
-    displayName = 'Pompes & Variateurs';
-    icon = Icons.water_drop_outlined;
-    gradient = const [Color(0xFFE0F2FE), Color(0xFFBAE6FD)];
-    iconColor = const Color(0xFF0284C7);
-  } else if (lower.contains('pomp')) {
-    displayName = 'Pompage Solaire';
-    icon = Icons.water_drop_outlined;
-    gradient = const [Color(0xFFE0F2FE), Color(0xFFBAE6FD)];
-    iconColor = const Color(0xFF0284C7);
-  } else if (lower.contains('variateur')) {
-    displayName = 'Variateurs Solaires';
-    icon = Icons.speed_outlined;
-    gradient = const [Color(0xFFE0F2FE), Color(0xFFBAE6FD)];
-    iconColor = const Color(0xFF0284C7);
-  } else if (lower.contains('groupe') ||
-      lower.contains('electrogene') ||
-      lower.contains('électrogène')) {
-    displayName =
-        lower.contains('maroc') ? 'Groupes Maroc' : 'Groupes Électrogènes';
-    icon = Icons.precision_manufacturing_outlined;
-    gradient = const [Color(0xFFFFEDD5), Color(0xFFFED7AA)];
-    iconColor = const Color(0xFFC2410C);
-  } else if (lower.contains('eclairage') || lower.contains('éclairage')) {
-    displayName = lower.contains('eclairages')
-        ? 'Éclairage Extérieur'
-        : 'Éclairage Solaire';
-    icon = Icons.wb_incandescent_outlined;
-    gradient = const [Color(0xFFFEF9C3), Color(0xFFFEF08A)];
-    iconColor = const Color(0xFFA16207);
-  } else if (lower.contains('monitoring')) {
-    displayName = 'Monitoring & Sécurité';
-    icon = Icons.query_stats_outlined;
-    gradient = const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)];
-    iconColor = const Color(0xFF334155);
-  } else if (lower.contains('gadget') ||
-      lower.contains('protection') ||
-      lower.contains('outillage') ||
-      lower.contains('coffret')) {
-    displayName = 'Coffrets & Protection';
-    icon = Icons.shield_outlined;
-    gradient = const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)];
-    iconColor = const Color(0xFF334155);
-  } else if (lower.contains('goodies')) {
-    displayName = 'Goodies & Cadeaux';
-    icon = Icons.card_giftcard_outlined;
-    gradient = const [Color(0xFFFCE7F3), Color(0xFFFBCFE8)];
-    iconColor = const Color(0xFFBE185D);
-  } else {
-    displayName = rawName.isNotEmpty
-        ? rawName[0].toUpperCase() + rawName.substring(1)
-        : 'Catégorie';
-    icon = Icons.solar_power_outlined;
+  Category? categoryFrom(List<Category> categories) {
+    // Prefer a main category; a battery subtype must not hide other batteries.
+    for (final name in categoryNames) {
+      for (final category in categories) {
+        if (_normalizeCategoryName(category.name) == name) {
+          return category;
+        }
+      }
+    }
+    return null;
   }
-
-  return _CategoryVisualMeta(
-    displayName: displayName,
-    icon: icon,
-    gradient: gradient,
-    iconColor: iconColor,
-  );
 }
+
+String _normalizeCategoryName(String name) {
+  var normalized = name.toLowerCase();
+  for (final entry in const {
+    'à': 'a',
+    'â': 'a',
+    'é': 'e',
+    'è': 'e',
+    'ê': 'e',
+    'ë': 'e',
+    'î': 'i',
+    'ï': 'i',
+    'ô': 'o',
+    'ù': 'u',
+    'û': 'u',
+    'ç': 'c',
+  }.entries) {
+    normalized = normalized.replaceAll(entry.key, entry.value);
+  }
+  return normalized.replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+}
+
+const _solarUniverses = [
+  _SolarUniverse(
+    displayName: 'Panneaux Solaires',
+    icon: Icons.solar_power_outlined,
+    gradient: [Color(0xFFFEF3C7), Color(0xFFFCD34D)],
+    iconColor: Color(0xFFB45309),
+    categoryNames: [
+      'panneaux solaires',
+      'panneau solaire',
+      'panneaux',
+      'panneau'
+    ],
+    query: 'panneau',
+  ),
+  _SolarUniverse(
+    displayName: 'Onduleurs & Hybrides',
+    icon: Icons.electric_bolt_outlined,
+    gradient: [Color(0xFFE0E7FF), Color(0xFFC7D2FE)],
+    iconColor: Color(0xFF3730A3),
+    categoryNames: [
+      'onduleurs',
+      'onduleur',
+      'onduleurs hybrides',
+      'onduleurs et hybrides'
+    ],
+    query: 'onduleur',
+  ),
+  _SolarUniverse(
+    displayName: 'Batteries & Stockage',
+    icon: Icons.battery_charging_full_outlined,
+    gradient: [Color(0xFFD1FAE5), Color(0xFFA7F3D0)],
+    iconColor: Color(0xFF065F46),
+    categoryNames: [
+      'batteries',
+      'batterie',
+      'batteries stockage',
+      'batteries et stockage'
+    ],
+    query: 'batterie',
+  ),
+  _SolarUniverse(
+    displayName: 'Pompage & Variateurs',
+    icon: Icons.water_drop_outlined,
+    gradient: [Color(0xFFE0F2FE), Color(0xFFBAE6FD)],
+    iconColor: Color(0xFF0284C7),
+    categoryNames: [
+      'variateurs et pompes',
+      'pompage solaire',
+      'pompage',
+      'pompage variateurs'
+    ],
+    query: 'pompage',
+  ),
+  _SolarUniverse(
+    displayName: 'Coffrets & Câblage',
+    icon: Icons.shield_outlined,
+    gradient: [Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
+    iconColor: Color(0xFF334155),
+    categoryNames: [
+      'coffrets cablage',
+      'coffrets et cablage',
+      'coffrets de protection',
+      'gadgets protections outillages',
+      'monitoring protections outillages',
+    ],
+    query: 'coffret',
+  ),
+  _SolarUniverse(
+    displayName: 'Éclairage Solaire',
+    icon: Icons.wb_incandescent_outlined,
+    gradient: [Color(0xFFFEF9C3), Color(0xFFFEF08A)],
+    iconColor: Color(0xFFA16207),
+    categoryNames: [
+      'eclairages',
+      'eclairage solaire',
+      'eclairages solaires',
+      'eclairage'
+    ],
+    query: 'eclairage',
+  ),
+];
 
 class _CategoryGridConfig {
   const _CategoryGridConfig({
@@ -1264,40 +1266,13 @@ class _CategoryGridConfig {
   final double crossAxisSpacing;
   final double mainAxisSpacing;
 
-  static _CategoryGridConfig of(double width) {
-    if (width >= 1000) {
-      // Grand écran / Ordinateur : 6 colonnes élégantes (aligne les 6 univers solaires)
-      return const _CategoryGridConfig(
-        crossAxisCount: 6,
-        mainAxisExtent: 124,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-      );
-    }
-    if (width >= 768) {
-      // Écran moyen / Tablette paysage / PC compact : 5 colonnes
-      return const _CategoryGridConfig(
-        crossAxisCount: 5,
-        mainAxisExtent: 122,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      );
-    }
-    if (width >= 560) {
-      // Tablette portrait / Écran intermédiaire : 4 colonnes
-      return const _CategoryGridConfig(
-        crossAxisCount: 4,
-        mainAxisExtent: 120,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      );
-    }
-    // Smartphone mobile (< 560px) : 3 colonnes compactes (design mobile validé)
-    return const _CategoryGridConfig(
+  static _CategoryGridConfig of(double width, double textScale) {
+    return _CategoryGridConfig(
       crossAxisCount: 3,
-      mainAxisExtent: 118,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
+      mainAxisExtent:
+          (width >= 560 ? 134 : 118) + (textScale - 1).clamp(0.0, 2.0) * 64,
+      crossAxisSpacing: width >= 560 ? 14 : 10,
+      mainAxisSpacing: width >= 560 ? 14 : 10,
     );
   }
 }
@@ -1313,11 +1288,14 @@ class _SolarUniverseGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final config = _CategoryGridConfig.of(constraints.maxWidth);
+        final config = _CategoryGridConfig.of(
+          constraints.maxWidth,
+          MediaQuery.textScalerOf(context).scale(12) / 12,
+        );
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: categories.length,
+          itemCount: _solarUniverses.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: config.crossAxisCount,
             mainAxisSpacing: config.mainAxisSpacing,
@@ -1325,10 +1303,16 @@ class _SolarUniverseGrid extends StatelessWidget {
             mainAxisExtent: config.mainAxisExtent,
           ),
           itemBuilder: (context, index) {
-            final category = categories[index];
+            final universe = _solarUniverses[index];
+            final category = universe.categoryFrom(categories);
             return _CategoryGlassCard(
-              category: category,
-              onTap: () => context.push('/catalog?category=${category.id}'),
+              universe: universe,
+              onTap: () => context.push(Uri(
+                path: '/catalog',
+                queryParameters: category != null
+                    ? {'category': '${category.id}'}
+                    : {'q': universe.query},
+              ).toString()),
             );
           },
         );
@@ -1339,11 +1323,11 @@ class _SolarUniverseGrid extends StatelessWidget {
 
 class _CategoryGlassCard extends StatefulWidget {
   const _CategoryGlassCard({
-    required this.category,
+    required this.universe,
     required this.onTap,
   });
 
-  final Category category;
+  final _SolarUniverse universe;
   final VoidCallback onTap;
 
   @override
@@ -1356,7 +1340,7 @@ class _CategoryGlassCardState extends State<_CategoryGlassCard> {
 
   @override
   Widget build(BuildContext context) {
-    final meta = _getCategoryVisual(widget.category);
+    final meta = widget.universe;
     final active = _hovered || _pressed;
 
     return MouseRegion(
@@ -1452,19 +1436,16 @@ class _CategoryGlassCardState extends State<_CategoryGlassCard> {
                         Expanded(
                           child: Align(
                             alignment: Alignment.center,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                meta.displayName,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                style: const TextStyle(
-                                  color: Color(0xFF0F172A),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.18,
-                                  letterSpacing: -0.2,
-                                ),
+                            child: Text(
+                              meta.displayName,
+                              textAlign: TextAlign.center,
+                              maxLines: 3,
+                              style: const TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                height: 1.18,
+                                letterSpacing: -0.2,
                               ),
                             ),
                           ),
@@ -1489,11 +1470,14 @@ class _SolarCategoriesGridSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final config = _CategoryGridConfig.of(constraints.maxWidth);
+        final config = _CategoryGridConfig.of(
+          constraints.maxWidth,
+          MediaQuery.textScalerOf(context).scale(12) / 12,
+        );
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: config.crossAxisCount,
+          itemCount: _solarUniverses.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: config.crossAxisCount,
             mainAxisSpacing: config.mainAxisSpacing,
@@ -1574,83 +1558,70 @@ class _SupportPanelState extends State<_SupportPanel> {
         curve: Curves.easeOutCubic,
         scale: _hovered ? 1.005 : 1,
         child: Container(
+          key: const ValueKey('home-support-panel'),
+          width: double.infinity,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0A192F).withValues(
-                  alpha: _hovered ? 0.20 : 0.12,
+                color: AppColors.navy.withValues(
+                  alpha: _hovered ? 0.10 : 0.06,
                 ),
-                blurRadius: _hovered ? 20 : 14,
+                blurRadius: _hovered ? 26 : 20,
                 offset: const Offset(0, 8),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Material(
-                color: Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            child: Material(
+              color: Colors.white,
+              child: Ink(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.white, Color(0xFFF3FAF7)],
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: _hovered
+                        ? AppColors.leaf.withValues(alpha: 0.45)
+                        : const Color(0xFFD6E8DF),
+                  ),
+                ),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(24),
                   onTap: _openWhatsApp,
-                  splashColor: Colors.white.withValues(alpha: 0.08),
-                  highlightColor: Colors.white.withValues(alpha: 0.05),
-                  child: Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFF0A192F).withValues(alpha: 0.90),
-                          const Color(0xFF132F5B).withValues(alpha: 0.85),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: _hovered
-                            ? const Color(0xFF25D366).withValues(alpha: 0.60)
-                            : Colors.white.withValues(alpha: 0.15),
-                        width: 1.1,
-                      ),
-                    ),
+                  splashColor: AppColors.leaf.withValues(alpha: 0.08),
+                  highlightColor: AppColors.leaf.withValues(alpha: 0.03),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        final compact = constraints.maxWidth < 520;
+                        final compact = constraints.maxWidth < 680 ||
+                            MediaQuery.textScalerOf(context).scale(14) > 18;
                         final button = _WhatsAppCtaButton(
                           hovered: _hovered,
-                          expand: compact,
                         );
 
                         if (compact) {
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              const _SupportIcon(),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const _SupportPanelText(),
-                                    const SizedBox(height: 12),
-                                    button,
-                                  ],
-                                ),
-                              ),
+                              const _SupportPanelText(),
+                              const SizedBox(height: 18),
+                              button,
                             ],
                           );
                         }
 
                         return Row(
                           children: [
-                            const _SupportIcon(),
-                            const SizedBox(width: 14),
                             const Expanded(child: _SupportPanelText()),
-                            const SizedBox(width: 16),
-                            button,
+                            const SizedBox(width: 24),
+                            SizedBox(width: 260, child: button),
                           ],
                         );
                       },
@@ -1672,16 +1643,21 @@ class _SupportIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 46,
-      height: 46,
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppRadii.md),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.softSun, Color(0xFFFFE8A4)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.sun.withValues(alpha: 0.35)),
       ),
       child: const Icon(
         Icons.support_agent_rounded,
-        color: Colors.white,
-        size: 24,
+        color: AppColors.navy,
+        size: 28,
       ),
     );
   }
@@ -1693,21 +1669,50 @@ class _SupportPanelText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Besoin de conseils ?',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SupportIcon(),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'À VOTRE ÉCOUTE',
+                    style: TextStyle(
+                      color: AppColors.leaf,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'Besoin de conseils ?',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.navy,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                          letterSpacing: -0.4,
+                        ),
+                  ),
+                ],
               ),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 12),
         Text(
-          'Nos équipes vous accompagnent dans votre projet énergétique.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: const Color(0xFFC9D7E2),
-                height: 1.35,
+          'Notre équipe vous aide à choisir la solution solaire adaptée à votre projet.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.muted,
+                fontSize: 13,
+                height: 1.5,
               ),
         ),
       ],
@@ -1718,54 +1723,59 @@ class _SupportPanelText extends StatelessWidget {
 class _WhatsAppCtaButton extends StatelessWidget {
   const _WhatsAppCtaButton({
     required this.hovered,
-    required this.expand,
   });
 
   final bool hovered;
-  final bool expand;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      width: expand ? double.infinity : null,
-      constraints: const BoxConstraints(minHeight: 44),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 52),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: hovered ? AppColors.sun : Colors.white,
-        borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(
-          color: hovered ? AppColors.sun : Colors.white.withValues(alpha: 0.78),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: hovered
+              ? const [Color(0xFF12764A), Color(0xFF0D5638)]
+              : const [Color(0xFF168A55), Color(0xFF126941)],
         ),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: hovered ? 0.18 : 0.10),
+            color: AppColors.leaf.withValues(alpha: hovered ? 0.24 : 0.16),
             blurRadius: hovered ? 16 : 10,
-            offset: const Offset(0, 7),
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
+          const Icon(
             Icons.chat_bubble_rounded,
-            size: 18,
-            color: hovered ? AppColors.navy : AppColors.leaf,
+            size: 20,
+            color: Colors.white,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Flexible(
             child: Text(
-              'Nous contacter sur WhatsApp',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              'Échanger sur WhatsApp',
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.navy,
+                    color: Colors.white,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
+                    height: 1.2,
                   ),
             ),
           ),
+          const SizedBox(width: 8),
+          const Icon(Icons.arrow_forward_rounded,
+              size: 18, color: Colors.white),
         ],
       ),
     );
