@@ -124,19 +124,19 @@ class AssistantApiService {
 
       return "Je n'ai pas pu traiter votre demande.";
     } on TimeoutException {
-      return 'Le serveur d\'intelligence artificielle met trop de temps à répondre (timeout 60s). Veuillez réessayer.';
+      return 'Votre conseiller HeliAntha prend un instant de plus pour affiner son analyse. N’hésitez pas à relancer votre question, nous sommes à votre entière disposition.';
     } on DioException catch (dioError) {
       if (dioError.type == DioExceptionType.connectionTimeout ||
           dioError.type == DioExceptionType.receiveTimeout ||
           dioError.type == DioExceptionType.sendTimeout) {
-        return 'Délai d\'attente dépassé (60s). Le conseiller IA est temporairement occupé, merci de relancer votre question.';
+        return 'Votre conseiller HeliAntha finalise votre étude personnalisée. Merci de renouveler votre question si elle ne s’affiche pas immédiatement.';
       }
       if (dioError.type == DioExceptionType.connectionError) {
-        return 'Connexion au serveur IA impossible. Vérifiez votre accès réseau.';
+        return 'Votre connexion réseau semble interrompue. Vérifiez votre accès Internet pour échanger avec notre conseiller.';
       }
-      return 'Une erreur de communication est survenue. Nos conseillers techniques restent joignables directement par téléphone ou WhatsApp.';
+      return 'Nos échanges sont momentanément interrompus. Nos conseillers solaires restent immédiatement à votre écoute par téléphone ou sur WhatsApp.';
     } catch (_) {
-      return 'Une erreur inattendue est survenue lors de l\'échange avec l\'assistant.';
+      return 'Un contretemps est survenu lors de l’échange. Nos conseillers solaires se tiennent à votre disposition par WhatsApp ou téléphone pour vous répondre.';
     }
   }
 }

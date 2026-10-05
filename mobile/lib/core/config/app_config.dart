@@ -1,6 +1,23 @@
 import 'package:flutter/foundation.dart';
 
 class AppConfig {
+  static const supportWhatsAppNumber = '212661575128';
+  static const supportWhatsAppDisplay = '+212 661 57 51 28';
+  static const supportEmail = 'contact@heliantha.ma';
+  static const supportPhoneNumber = '0530133583';
+  static const supportPhoneDisplay = '05 30 13 35 83';
+
+  static Uri supportWhatsAppUri({String? message}) => Uri.https(
+        'wa.me',
+        '/$supportWhatsAppNumber',
+        message == null ? null : {'text': message},
+      );
+
+  static Uri get supportEmailUri => Uri(scheme: 'mailto', path: supportEmail);
+
+  static Uri get supportPhoneUri =>
+      Uri(scheme: 'tel', path: supportPhoneNumber);
+
   static const productionApiBaseUrl = 'https://app.heliantha.ma';
   static const productionAppBaseUrl = 'https://app.heliantha.ma';
 

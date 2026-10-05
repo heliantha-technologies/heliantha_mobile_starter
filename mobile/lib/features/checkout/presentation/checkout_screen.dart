@@ -15,6 +15,7 @@ import '../../../shared/widgets/brand_widgets.dart';
 import '../../addresses/providers/addresses_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../cart/providers/cart_provider.dart';
+import '../../catalog/providers/store_context_provider.dart';
 import '../../notifications/services/fcm_service.dart';
 import '../domain/checkout_models.dart';
 import '../providers/checkout_provider.dart';
@@ -51,6 +52,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   int? _selectedCarrierId;
   String? _selectedPaymentModule;
   int? _activeAddressId;
+  int? _checkoutCurrencyId;
+  int? _checkoutLanguageId;
+  int _previewRequestId = 0;
   late final String _idempotencyKey;
 
   @override
@@ -84,7 +88,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   void _loadPreview(
       {int? carrierId, int? addressId, bool keepCarrier = false}) {
-    final lines = CheckoutLineRequest.fromCart(ref.read(cartProvider));
+    if (!mounted) return;
     setState(() {
       if (!keepCarrier) {
         _selectedCarrierId = carrierId;
@@ -93,23 +97,67 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         _activeAddressId = addressId;
       }
       _selectedPaymentModule = null;
-      _previewFuture = ref.read(checkoutRepositoryProvider).preview(
-            lines: lines,
-            carrierId: carrierId,
-            addressId: addressId ?? _activeAddressId,
-          );
+      _previewFuture = _requestPreview(
+        carrierId: carrierId,
+        addressId: addressId ?? _activeAddressId,
+      );
     });
+  }
+
+  Future<CheckoutPreview> _requestPreview(
+      {int? carrierId, int? addressId}) async {
+    final requestId = ++_previewRequestId;
+    final cart = ref.read(cartProvider.notifier);
+    final currencySelection = ref.read(selectedCurrencyIdProvider.notifier);
+    final languageSelection = ref.read(selectedLanguageIdProvider.notifier);
+    final contextFuture = ref.read(storeContextProvider.future);
+    await Future.wait(
+        [cart.ready, currencySelection.ready, languageSelection.ready]);
+    final store = await contextFuture;
+    if (!mounted) throw StateError('Checkout closed');
+    final items = ref.read(cartProvider);
+    final selectedCurrencyId = ref.read(selectedCurrencyIdProvider);
+    final cartCode = items.firstOrNull?.product.currency;
+    final savedCurrencyId = cart.currencyId ??
+        store.currencies
+            .where((currency) => currency.isoCode == cartCode)
+            .firstOrNull
+            ?.id;
+    final currencyId =
+        store.effectiveCurrencyId(selectedCurrencyId ?? savedCurrencyId);
+    final languageId =
+        store.effectiveLanguageId(ref.read(selectedLanguageIdProvider));
+    await cart.refreshCurrency(currencyId, force: true);
+    if (!mounted) throw StateError('Checkout closed');
+    final preview = await ref.read(checkoutRepositoryProvider).preview(
+          lines: CheckoutLineRequest.fromCart(ref.read(cartProvider)),
+          currencyId: currencyId,
+          languageId: languageId,
+          carrierId: carrierId,
+          addressId: addressId,
+        );
+    final expectedCurrency = store.currencies
+        .where((currency) => currency.id == currencyId)
+        .firstOrNull;
+    if (expectedCurrency != null &&
+        preview.totals.currency != expectedCurrency.isoCode) {
+      throw StateError('Unexpected checkout currency');
+    }
+    if (requestId == _previewRequestId) {
+      _checkoutCurrencyId = currencyId;
+      _checkoutLanguageId = languageId;
+    }
+    return preview;
   }
 
   void _recalculateForCarrier(int carrierId) {
     setState(() {
       _selectedCarrierId = carrierId;
       _message = null;
-      _previewFuture = ref.read(checkoutRepositoryProvider).preview(
-            lines: CheckoutLineRequest.fromCart(ref.read(cartProvider)),
-            carrierId: carrierId,
-            addressId: _activeAddressId,
-          );
+      _previewFuture = _requestPreview(
+        carrierId: carrierId,
+        addressId: _activeAddressId,
+      );
     });
   }
 
@@ -156,11 +204,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             email: _email.text.trim(),
             password: _loginPassword.text,
           );
+      if (!mounted) return;
       ref.invalidate(currentUserProvider);
       ref.invalidate(addressesProvider);
       await ref.read(fcmServiceProvider).registerForCurrentUser();
+      if (!mounted) return;
       setState(() => _message = 'Connexion réussie.');
     } catch (_) {
+      if (!mounted) return;
       setState(() => _message = friendlyLoginMessage());
     } finally {
       if (mounted) {
@@ -175,6 +226,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     required AddressModel? userAddress,
   }) async {
     if (_confirming || _orderConfirmed) {
+      return;
+    }
+    final sync = ref.read(cartSyncStateProvider);
+    if (sync.isLoading ||
+        sync.hasError ||
+        (ref.read(selectedCurrencyIdProvider) != null &&
+            ref.read(selectedCurrencyIdProvider) != _checkoutCurrencyId)) {
+      _loadPreview(addressId: _activeAddressId);
       return;
     }
     if (!_terms) {
@@ -220,6 +279,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             lines: CheckoutLineRequest.fromCart(ref.read(cartProvider)),
             mode: effectiveMode,
             idempotencyKey: _idempotencyKey,
+            currencyId: _checkoutCurrencyId,
+            languageId: _checkoutLanguageId,
             guest: !isConnected && effectiveMode == 'guest'
                 ? {
                     'title': _title,
@@ -254,6 +315,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         paymentModule: paymentModule,
       );
     } catch (error) {
+      if (!mounted) return;
       setState(
         () => _message = friendlyCheckoutMessage(error),
       );
@@ -338,6 +400,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final addressesAsync = isConnected ? ref.watch(addressesProvider) : null;
     final userAddresses = addressesAsync?.valueOrNull;
     final userAddress = userAddresses?.firstOrNull;
+
+    ref.listen<int?>(selectedCurrencyIdProvider, (previous, next) {
+      if (previous != next &&
+          _previewFuture != null &&
+          !_confirming &&
+          !_orderConfirmed) {
+        _loadPreview(
+          carrierId: _selectedCarrierId,
+          addressId: _activeAddressId,
+          keepCarrier: true,
+        );
+      }
+    });
 
     ref.listen(addressesProvider, (previous, next) {
       final address = next.valueOrNull?.firstOrNull;
@@ -1710,10 +1785,11 @@ class _BankWireOrderDialog extends StatelessWidget {
                     Expanded(
                       child: Text(
                         'Virement bancaire',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: AppColors.ink,
-                              fontWeight: FontWeight.w900,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: AppColors.ink,
+                                  fontWeight: FontWeight.w900,
+                                ),
                       ),
                     ),
                     TextButton.icon(
@@ -1740,10 +1816,11 @@ class _BankWireOrderDialog extends StatelessWidget {
                       if (hasReference) ...[
                         Text(
                           'Référence de commande',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.muted,
-                                fontWeight: FontWeight.w700,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.muted,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                         ),
                         const SizedBox(height: 2),
                         Wrap(
@@ -1753,7 +1830,10 @@ class _BankWireOrderDialog extends StatelessWidget {
                           children: [
                             Text(
                               reference!,
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(
                                     color: AppColors.blue,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -1804,7 +1884,10 @@ class _BankWireOrderDialog extends StatelessWidget {
                           Expanded(
                             child: Text(
                               'Coordonnées bancaires',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -1821,7 +1904,10 @@ class _BankWireOrderDialog extends StatelessWidget {
                             ),
                             child: Text(
                               'VIREMENT',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 0.7,
@@ -1853,10 +1939,11 @@ class _BankWireOrderDialog extends StatelessWidget {
                             customText,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.white,
-                                  height: 1.35,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.white,
+                                      height: 1.35,
+                                    ),
                           ),
                         ),
                       ],
@@ -1925,10 +2012,11 @@ class _BankWireOrderDialog extends StatelessWidget {
                         Expanded(
                           child: Text(
                             'Indiquez impérativement la référence $reference dans le motif de votre virement.',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.navy,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColors.navy,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                           ),
                         ),
                       ],

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/navigation_helpers.dart';
 import '../../../shared/models/address.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_tokens.dart';
@@ -8,6 +10,7 @@ import '../../../shared/utils/friendly_errors.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../providers/addresses_provider.dart';
 
 class AddressesScreen extends ConsumerWidget {
@@ -20,6 +23,50 @@ class AddressesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(currentUserProvider);
+    if (authState.isLoading ||
+        authState.hasError ||
+        authState.valueOrNull == null) {
+      return Scaffold(
+        appBar: AppTopBar(
+          subtitle: 'Mes adresses',
+          showBack: true,
+          backFallbackLocation: from == 'checkout' ? '/checkout' : '/account',
+        ),
+        body: SafeArea(
+          child: authState.when(
+            skipLoadingOnRefresh: false,
+            skipLoadingOnReload: false,
+            loading: () => const _AddressesSkeleton(),
+            error: (error, _) {
+              final friendly = friendlyLoadError(error);
+              return ResponsivePagePadding(
+                child: AppStatusPanel(
+                  icon: Icons.cloud_off_rounded,
+                  title: friendly.title,
+                  message: friendly.message,
+                  action: OutlinedButton.icon(
+                    onPressed: () => ref.invalidate(currentUserProvider),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Réessayer'),
+                  ),
+                ),
+              );
+            },
+            data: (_) => _GuestAddressesPanel(
+              onLogin: () => context.push(
+                loginLocationFor(
+                  from == 'checkout'
+                      ? '/addresses?from=checkout'
+                      : '/addresses',
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final addresses = ref.watch(addressesProvider);
 
     return Scaffold(
@@ -120,6 +167,63 @@ class AddressesScreen extends ConsumerWidget {
     if (saved == true) {
       ref.invalidate(addressesProvider);
     }
+  }
+}
+
+class _GuestAddressesPanel extends StatelessWidget {
+  const _GuestAddressesPanel({required this.onLogin});
+
+  final VoidCallback onLogin;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: ResponsivePagePadding(
+        child: AppSurface(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          radius: AppRadii.lg,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.navy,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                  ),
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: AppColors.sun,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Bienvenue chez HeliAntha',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Connectez-vous pour retrouver vos adresses et faciliter '
+                'la livraison de vos prochains équipements solaires.',
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: onLogin,
+                icon: const Icon(Icons.login_rounded),
+                label: const Text('Se connecter'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -366,6 +470,14 @@ class _AddressFormSheetState extends ConsumerState<_AddressFormSheet> {
     };
 
     try {
+      final user = await ref.read(currentUserProvider.future);
+      if (!mounted) return;
+      if (user == null) {
+        const message = 'Connectez-vous pour enregistrer votre adresse.';
+        setState(() => _error = message);
+        AppFeedback.info(context, message);
+        return;
+      }
       final repository = ref.read(addressesRepositoryProvider);
       if (_editing) {
         await repository.update(widget.address!.id, payload);

@@ -10,6 +10,8 @@ class CheckoutRepository {
 
   Future<CheckoutPreview> preview({
     required List<CheckoutLineRequest> lines,
+    int? currencyId,
+    int? languageId,
     int? carrierId,
     int? addressId,
   }) async {
@@ -17,6 +19,8 @@ class CheckoutRepository {
       '/v1/checkout/preview',
       data: {
         'lines': [for (final line in lines) line.toJson()],
+        if (currencyId != null) 'currency_id': currencyId,
+        if (languageId != null) 'language_id': languageId,
         if (carrierId != null) 'carrier_id': carrierId,
         if (addressId != null) 'address_id': addressId,
       },
@@ -30,6 +34,8 @@ class CheckoutRepository {
     required List<CheckoutLineRequest> lines,
     required String mode,
     required String idempotencyKey,
+    int? currencyId,
+    int? languageId,
     Map<String, dynamic>? guest,
     Map<String, dynamic>? address,
     int? addressId,
@@ -40,13 +46,14 @@ class CheckoutRepository {
       'lines': [for (final line in lines) line.toJson()],
       'mode': mode,
       'idempotency_key': idempotencyKey,
+      if (currencyId != null) 'currency_id': currencyId,
+      if (languageId != null) 'language_id': languageId,
       if (guest != null) 'guest': guest,
       if (address != null) 'address': address,
       if (addressId != null) 'address_id': addressId,
       if (carrierId != null) 'carrier_id': carrierId,
       if (paymentModule != null) 'payment_module': paymentModule,
     };
-
 
     try {
       final response = await _api.dio.post('/v1/checkout/confirm', data: body);

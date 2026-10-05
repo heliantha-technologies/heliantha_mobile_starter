@@ -5,8 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/router/navigation_helpers.dart';
-import '../../features/auth/providers/auth_provider.dart';
 import '../../features/cart/providers/cart_provider.dart';
 import '../../features/favorites/providers/favorites_provider.dart';
 import '../models/product.dart';
@@ -31,9 +29,6 @@ class ProductCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isFavorite = ref.watch(
       favoritesProvider.select((favorites) => favorites.contains(product.id)),
-    );
-    final isLoggedIn = ref.watch(
-      currentUserProvider.select((user) => user.valueOrNull != null),
     );
     final price = formatMoney(
       product.price,
@@ -91,10 +86,6 @@ class ProductCard extends ConsumerWidget {
                           : Icons.favorite_border_rounded,
                       color: isFavorite ? AppColors.danger : AppColors.navy,
                       onPressed: () {
-                        if (!isLoggedIn) {
-                          openLoginForCurrentLocation(context);
-                          return;
-                        }
                         HapticFeedback.selectionClick();
                         ref.read(favoritesProvider.notifier).toggle(product.id);
                         AppFeedback.info(

@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/router/navigation_helpers.dart';
 import '../../../shared/models/product.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_tokens.dart';
@@ -16,7 +15,6 @@ import '../../../shared/utils/money.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
-import '../../auth/providers/auth_provider.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../../catalog/providers/catalog_providers.dart';
 import '../../favorites/providers/favorites_provider.dart';
@@ -85,7 +83,6 @@ class _ProductBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final favorites = ref.watch(favoritesProvider);
-    final user = ref.watch(currentUserProvider).valueOrNull;
     final isFavorite = favorites.contains(product.id);
     final price = formatMoney(
       product.price,
@@ -111,10 +108,6 @@ class _ProductBody extends ConsumerWidget {
                 available: product.available,
                 isFavorite: isFavorite,
                 onToggleFavorite: () {
-                  if (user == null) {
-                    openLoginForCurrentLocation(context);
-                    return;
-                  }
                   ref.read(favoritesProvider.notifier).toggle(product.id);
                   AppFeedback.info(
                     context,

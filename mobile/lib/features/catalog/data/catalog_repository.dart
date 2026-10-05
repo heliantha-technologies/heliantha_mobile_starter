@@ -6,8 +6,8 @@ class CatalogRepository {
   CatalogRepository(this._api);
   final ApiClient _api;
   final Map<String, _CacheEntry<List<Product>>> _productsCache = {};
-  final Map<int, _CacheEntry<Product>> _productCache = {};
-  final Set<int> _loadedProductDetails = {};
+  final Map<String, _CacheEntry<Product>> _productCache = {};
+  final Set<String> _loadedProductDetails = {};
   _CacheEntry<List<Category>>? _categoriesCache;
 
   static const _cacheTtl = Duration(seconds: 45);
@@ -78,10 +78,13 @@ class CatalogRepository {
       DateTime.now().add(_cacheTtl),
     );
     for (final product in rows) {
-      _productCache[product.id] = _CacheEntry(
-        product,
-        DateTime.now().add(_detailCacheTtl),
-      );
+      final productKey = _productKey(product.id, languageId, currencyId);
+      if (!_loadedProductDetails.contains(productKey)) {
+        _productCache[productKey] = _CacheEntry(
+          product,
+          DateTime.now().add(_detailCacheTtl),
+        );
+      }
     }
     return rows;
   }
@@ -120,9 +123,14 @@ class CatalogRepository {
     int id, {
     int? languageId,
     int? currencyId,
+    bool forceRefresh = false,
   }) async {
-    final cached = _productCache[id];
-    if (cached != null && cached.isFresh && _loadedProductDetails.contains(id)) {
+    final key = _productKey(id, languageId, currencyId);
+    final cached = _productCache[key];
+    if (!forceRefresh &&
+        cached != null &&
+        cached.isFresh &&
+        _loadedProductDetails.contains(key)) {
       return cached.value;
     }
 
@@ -136,20 +144,27 @@ class CatalogRepository {
     final product = Product.fromJson(
       Map<String, dynamic>.from(response.data['data'] as Map),
     );
-    _productCache[id] = _CacheEntry(
+    _productCache[key] = _CacheEntry(
       product,
       DateTime.now().add(_detailCacheTtl),
     );
-    _loadedProductDetails.add(id);
+    _loadedProductDetails.add(key);
     return product;
   }
 
-  void rememberProduct(Product product) {
-    _productCache[product.id] = _CacheEntry(
+  void rememberProduct(Product product, {int? languageId, int? currencyId}) {
+    final key = _productKey(product.id, languageId, currencyId ?? product.currencyId);
+    if (_loadedProductDetails.contains(key)) {
+      return;
+    }
+    _productCache[key] = _CacheEntry(
       product,
       DateTime.now().add(_detailCacheTtl),
     );
   }
+
+  String _productKey(int id, int? languageId, int? currencyId) =>
+      '$id|${languageId ?? ''}|${currencyId ?? ''}';
 
   String _productsKey({
     required int page,

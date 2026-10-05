@@ -5,6 +5,7 @@ import 'package:open_filex/open_filex.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/config/app_config.dart';
+import '../../../shared/utils/friendly_errors.dart';
 
 class QuoteRepository {
   QuoteRepository(this._api);
@@ -131,24 +132,21 @@ class QuoteRepository {
     final responseData = error.response?.data;
     if (responseData is Map<String, dynamic>) {
       final detail = responseData['detail'];
+      if (detail is String && !containsTechnicalLeak(detail)) {
+        return detail.trim();
+      }
       if (detail is Map<String, dynamic>) {
         final nestedError = detail['error'] ?? detail['message'];
-        if (nestedError != null) {
-          return nestedError.toString();
+        if (nestedError is String && !containsTechnicalLeak(nestedError)) {
+          return nestedError.trim();
         }
       }
-      if (detail != null) {
-        return detail.toString();
-      }
       final message = responseData['message'] ?? responseData['error'];
-      if (message != null) {
-        return message.toString();
+      if (message is String && !containsTechnicalLeak(message)) {
+        return message.trim();
       }
     }
-    if (responseData is String && responseData.trim().isNotEmpty) {
-      return responseData.trim();
-    }
-    return error.message ?? 'Impossible de joindre le moteur de devis.';
+    return friendlyQuoteErrorMessage(error);
   }
 
   static String _safeFilePart(String value) {

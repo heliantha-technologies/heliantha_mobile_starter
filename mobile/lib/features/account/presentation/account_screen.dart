@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/router/navigation_helpers.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_tokens.dart';
@@ -281,12 +282,9 @@ class _GuestView extends StatelessWidget {
 class _ContactSection extends StatelessWidget {
   const _ContactSection();
 
-  static final Uri _phone = Uri(scheme: 'tel', path: '0530133583');
-  static final Uri _whatsapp = Uri.parse('https://wa.me/212661575128');
-  static final Uri _email = Uri(
-    scheme: 'mailto',
-    path: 'contact@heliantha.ma',
-  );
+  static final Uri _phone = AppConfig.supportPhoneUri;
+  static final Uri _whatsapp = AppConfig.supportWhatsAppUri();
+  static final Uri _email = AppConfig.supportEmailUri;
   static final Uri _location = Uri.parse(
     'https://maps.app.goo.gl/NjXA6uSfcy4WEFMu6',
   );
@@ -294,7 +292,10 @@ class _ContactSection extends StatelessWidget {
   Future<void> _open(BuildContext context, Uri uri) async {
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened && context.mounted) {
-      AppFeedback.error(context, 'Impossible d’ouvrir ce lien.');
+      AppFeedback.info(
+        context,
+        'Impossible d’ouvrir l’application externe. Retrouvez nos coordonnées directes ci-dessous.',
+      );
     }
   }
 
@@ -322,7 +323,7 @@ class _ContactSection extends StatelessWidget {
         _ContactTile(
           icon: Icons.phone_rounded,
           title: 'Appeler',
-          value: '05 30 13 35 83',
+          value: AppConfig.supportPhoneDisplay,
           subtitle: 'Numéro direct',
           color: AppColors.danger,
           onTap: () => _open(context, _phone),
@@ -331,7 +332,7 @@ class _ContactSection extends StatelessWidget {
         _ContactTile(
           icon: Icons.chat_bubble_rounded,
           title: 'WhatsApp',
-          value: '+212 661-575128',
+          value: AppConfig.supportWhatsAppDisplay,
           subtitle: 'Message rapide',
           color: AppColors.leaf,
           onTap: () => _open(context, _whatsapp),
@@ -348,7 +349,7 @@ class _ContactSection extends StatelessWidget {
         _ContactTile(
           icon: Icons.mail_rounded,
           title: 'E-mail',
-          value: 'contact@heliantha.ma',
+          value: AppConfig.supportEmail,
           subtitle: 'Réponse par mail',
           color: AppColors.blue,
           onTap: () => _open(context, _email),
@@ -486,4 +487,3 @@ class _LegalSection extends StatelessWidget {
     );
   }
 }
-

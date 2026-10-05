@@ -12,6 +12,7 @@ import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../catalog/providers/store_context_provider.dart';
 import '../domain/cart_item.dart';
 import '../providers/cart_provider.dart';
 
@@ -24,6 +25,7 @@ class CartScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider).valueOrNull;
     final total = ref.watch(cartTotalProvider);
     final currency = items.isEmpty ? 'MAD' : items.first.product.currency;
+    final sync = ref.watch(cartSyncStateProvider);
 
     return Scaffold(
       appBar: const AppTopBar(
@@ -65,6 +67,14 @@ class CartScreen extends ConsumerWidget {
                               total: total,
                               currency: currency,
                               isAuthenticated: user != null,
+                              sync: sync,
+                              onRetry: () => ref
+                                  .read(cartProvider.notifier)
+                                  .refreshCurrency(
+                                    ref.read(selectedCurrencyIdProvider),
+                                    force: true,
+                                  )
+                                  .catchError((Object _) {}),
                             ),
                           ),
                         ],
@@ -88,6 +98,14 @@ class CartScreen extends ConsumerWidget {
                                 total: total,
                                 currency: currency,
                                 isAuthenticated: user != null,
+                                sync: sync,
+                                onRetry: () => ref
+                                    .read(cartProvider.notifier)
+                                    .refreshCurrency(
+                                      ref.read(selectedCurrencyIdProvider),
+                                      force: true,
+                                    )
+                                    .catchError((Object _) {}),
                               ),
                             ],
                           ),
@@ -419,12 +437,16 @@ class _OrderSummary extends StatelessWidget {
     required this.total,
     required this.currency,
     required this.isAuthenticated,
+    required this.sync,
+    required this.onRetry,
   });
 
   final int itemCount;
   final double total;
   final String currency;
   final bool isAuthenticated;
+  final AsyncValue<void> sync;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -447,17 +469,34 @@ class _OrderSummary extends StatelessWidget {
           _SummaryRow(label: 'Produits', value: '$itemCount'),
           const Divider(height: 26),
           _SummaryRow(label: 'Total', value: totalText, strong: true),
+          if (sync.isLoading) ...[
+            const SizedBox(height: 14),
+            const LinearProgressIndicator(),
+            const SizedBox(height: 8),
+            const Text('Actualisation des prix dans votre devise…'),
+          ] else if (sync.hasError) ...[
+            const SizedBox(height: 14),
+            const Text(
+                'Nous n’avons pas pu actualiser les prix. Réessayez pour continuer.'),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Réessayer'),
+            ),
+          ],
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () {
-                if (isAuthenticated) {
-                  context.push('/checkout');
-                } else {
-                  context.push('/checkout/start');
-                }
-              },
+              onPressed: sync.isLoading || sync.hasError
+                  ? null
+                  : () {
+                      if (isAuthenticated) {
+                        context.push('/checkout');
+                      } else {
+                        context.push('/checkout/start');
+                      }
+                    },
               icon: const Icon(Icons.lock_open_rounded),
               label: const Text('Commander'),
             ),

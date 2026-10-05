@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../shared/models/category.dart';
 import '../../../shared/models/home_slide.dart';
 import '../../../shared/theme/app_colors.dart';
@@ -1069,8 +1070,7 @@ class _QuotePromoCtaCardState extends State<_QuotePromoCtaCard> {
                                             Color(0xFFF59E0B),
                                           ],
                                         ),
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                         boxShadow: [
                                           BoxShadow(
                                             color: const Color(0xFFE5A93C)
@@ -1168,7 +1168,8 @@ _CategoryVisualMeta _getCategoryVisual(Category category) {
     gradient = const [Color(0xFFEDE9FE), Color(0xFFDDD6FE)];
     iconColor = const Color(0xFF5B21B6);
   } else if (lower.contains('on-grid') || lower.contains('on grid')) {
-    displayName = lower.contains('hybride') ? 'Hybride On-Grid' : 'Réseau On-Grid';
+    displayName =
+        lower.contains('hybride') ? 'Hybride On-Grid' : 'Réseau On-Grid';
     icon = Icons.sync_alt_rounded;
     gradient = const [Color(0xFFEDE9FE), Color(0xFFDDD6FE)];
     iconColor = const Color(0xFF5B21B6);
@@ -1202,13 +1203,18 @@ _CategoryVisualMeta _getCategoryVisual(Category category) {
     icon = Icons.speed_outlined;
     gradient = const [Color(0xFFE0F2FE), Color(0xFFBAE6FD)];
     iconColor = const Color(0xFF0284C7);
-  } else if (lower.contains('groupe') || lower.contains('electrogene') || lower.contains('électrogène')) {
-    displayName = lower.contains('maroc') ? 'Groupes Maroc' : 'Groupes Électrogènes';
+  } else if (lower.contains('groupe') ||
+      lower.contains('electrogene') ||
+      lower.contains('électrogène')) {
+    displayName =
+        lower.contains('maroc') ? 'Groupes Maroc' : 'Groupes Électrogènes';
     icon = Icons.precision_manufacturing_outlined;
     gradient = const [Color(0xFFFFEDD5), Color(0xFFFED7AA)];
     iconColor = const Color(0xFFC2410C);
   } else if (lower.contains('eclairage') || lower.contains('éclairage')) {
-    displayName = lower.contains('eclairages') ? 'Éclairage Extérieur' : 'Éclairage Solaire';
+    displayName = lower.contains('eclairages')
+        ? 'Éclairage Extérieur'
+        : 'Éclairage Solaire';
     icon = Icons.wb_incandescent_outlined;
     gradient = const [Color(0xFFFEF9C3), Color(0xFFFEF08A)];
     iconColor = const Color(0xFFA16207);
@@ -1217,7 +1223,10 @@ _CategoryVisualMeta _getCategoryVisual(Category category) {
     icon = Icons.query_stats_outlined;
     gradient = const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)];
     iconColor = const Color(0xFF334155);
-  } else if (lower.contains('gadget') || lower.contains('protection') || lower.contains('outillage') || lower.contains('coffret')) {
+  } else if (lower.contains('gadget') ||
+      lower.contains('protection') ||
+      lower.contains('outillage') ||
+      lower.contains('coffret')) {
     displayName = 'Coffrets & Protection';
     icon = Icons.shield_outlined;
     gradient = const [Color(0xFFF1F5F9), Color(0xFFE2E8F0)];
@@ -1242,6 +1251,57 @@ _CategoryVisualMeta _getCategoryVisual(Category category) {
   );
 }
 
+class _CategoryGridConfig {
+  const _CategoryGridConfig({
+    required this.crossAxisCount,
+    required this.mainAxisExtent,
+    required this.crossAxisSpacing,
+    required this.mainAxisSpacing,
+  });
+
+  final int crossAxisCount;
+  final double mainAxisExtent;
+  final double crossAxisSpacing;
+  final double mainAxisSpacing;
+
+  static _CategoryGridConfig of(double width) {
+    if (width >= 1000) {
+      // Grand écran / Ordinateur : 6 colonnes élégantes (aligne les 6 univers solaires)
+      return const _CategoryGridConfig(
+        crossAxisCount: 6,
+        mainAxisExtent: 124,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
+      );
+    }
+    if (width >= 768) {
+      // Écran moyen / Tablette paysage / PC compact : 5 colonnes
+      return const _CategoryGridConfig(
+        crossAxisCount: 5,
+        mainAxisExtent: 122,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      );
+    }
+    if (width >= 560) {
+      // Tablette portrait / Écran intermédiaire : 4 colonnes
+      return const _CategoryGridConfig(
+        crossAxisCount: 4,
+        mainAxisExtent: 120,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      );
+    }
+    // Smartphone mobile (< 560px) : 3 colonnes compactes (design mobile validé)
+    return const _CategoryGridConfig(
+      crossAxisCount: 3,
+      mainAxisExtent: 118,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+    );
+  }
+}
+
 class _SolarUniverseGrid extends StatelessWidget {
   const _SolarUniverseGrid({
     required this.categories,
@@ -1251,21 +1311,26 @@ class _SolarUniverseGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: categories.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 0.88,
-      ),
-      itemBuilder: (context, index) {
-        final category = categories[index];
-        return _CategoryGlassCard(
-          category: category,
-          onTap: () => context.push('/catalog?category=${category.id}'),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final config = _CategoryGridConfig.of(constraints.maxWidth);
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: categories.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: config.crossAxisCount,
+            mainAxisSpacing: config.mainAxisSpacing,
+            crossAxisSpacing: config.crossAxisSpacing,
+            mainAxisExtent: config.mainAxisExtent,
+          ),
+          itemBuilder: (context, index) {
+            final category = categories[index];
+            return _CategoryGlassCard(
+              category: category,
+              onTap: () => context.push('/catalog?category=${category.id}'),
+            );
+          },
         );
       },
     );
@@ -1287,106 +1352,125 @@ class _CategoryGlassCard extends StatefulWidget {
 
 class _CategoryGlassCardState extends State<_CategoryGlassCard> {
   bool _pressed = false;
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final meta = _getCategoryVisual(widget.category);
+    final active = _hovered || _pressed;
 
-    return AnimatedScale(
-      duration: const Duration(milliseconds: 140),
-      curve: Curves.easeOutCubic,
-      scale: _pressed ? 0.96 : 1.0,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-            BoxShadow(
-              color: Colors.white.withValues(alpha: 0.70),
-              blurRadius: 1,
-              offset: const Offset(0, -1),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onHighlightChanged: (val) => setState(() => _pressed = val),
-                onTap: widget.onTap,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.84),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.95),
-                      width: 1.1,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: meta.gradient,
-                          ),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            width: 1.0,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: meta.iconColor.withValues(alpha: 0.16),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Icon(
-                            meta.icon,
-                            size: 22,
-                            color: meta.iconColor,
-                          ),
-                        ),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() {
+        _hovered = false;
+        _pressed = false;
+      }),
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        scale: _pressed ? 0.96 : (active ? 1.025 : 1.0),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: active
+                    ? meta.iconColor.withValues(alpha: 0.16)
+                    : const Color(0xFF0F172A).withValues(alpha: 0.05),
+                blurRadius: active ? 16 : 10,
+                offset: Offset(0, active ? 6 : 4),
+              ),
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.70),
+                blurRadius: 1,
+                offset: const Offset(0, -1),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onHighlightChanged: (val) => setState(() => _pressed = val),
+                  onTap: widget.onTap,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? Colors.white.withValues(alpha: 0.96)
+                          : Colors.white.withValues(alpha: 0.84),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: active
+                            ? meta.iconColor.withValues(alpha: 0.45)
+                            : Colors.white.withValues(alpha: 0.95),
+                        width: active ? 1.4 : 1.1,
                       ),
-                      const SizedBox(height: 7),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              meta.displayName,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              style: const TextStyle(
-                                color: Color(0xFF0F172A),
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                height: 1.16,
-                                letterSpacing: -0.2,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: meta.gradient,
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              width: 1.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: meta.iconColor.withValues(alpha: 0.16),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Icon(
+                              meta.icon,
+                              size: 22,
+                              color: meta.iconColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                meta.displayName,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                style: const TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.18,
+                                  letterSpacing: -0.2,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1403,42 +1487,47 @@ class _SolarCategoriesGridSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 6,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 0.88,
-      ),
-      itemBuilder: (context, index) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  width: 1.1,
-                ),
-              ),
-              child: Center(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final config = _CategoryGridConfig.of(constraints.maxWidth);
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: config.crossAxisCount,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: config.crossAxisCount,
+            mainAxisSpacing: config.mainAxisSpacing,
+            crossAxisSpacing: config.crossAxisSpacing,
+            mainAxisExtent: config.mainAxisExtent,
+          ),
+          itemBuilder: (context, index) {
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
-                  width: 40,
-                  height: 40,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFFE2E8F0).withValues(alpha: 0.6),
+                    color: Colors.white.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      width: 1.1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFE2E8F0).withValues(alpha: 0.6),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -1453,13 +1542,9 @@ class _SupportPanel extends StatefulWidget {
 }
 
 class _SupportPanelState extends State<_SupportPanel> {
-  static final Uri _whatsappUrl = Uri.https(
-    'wa.me',
-    '/212661575128',
-    {
-      'text':
-          'Bonjour Heliantha, je souhaite avoir des informations sur vos solutions énergétiques.',
-    },
+  static final Uri _whatsappUrl = AppConfig.supportWhatsAppUri(
+    message:
+        'Bonjour Heliantha, je souhaite avoir des informations sur vos solutions énergétiques.',
   );
 
   bool _hovered = false;
@@ -1471,7 +1556,10 @@ class _SupportPanelState extends State<_SupportPanel> {
       webOnlyWindowName: '_blank',
     );
     if (!opened && mounted) {
-      AppFeedback.error(context, 'Impossible d’ouvrir WhatsApp.');
+      AppFeedback.info(
+        context,
+        'Nous n’avons pas pu ouvrir WhatsApp directement. Vous pouvez joindre notre service client au ${AppConfig.supportWhatsAppDisplay}.',
+      );
     }
   }
 
@@ -1528,54 +1616,54 @@ class _SupportPanelState extends State<_SupportPanel> {
                         width: 1.1,
                       ),
                     ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 520;
-                  final button = _WhatsAppCtaButton(
-                    hovered: _hovered,
-                    expand: compact,
-                  );
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 520;
+                        final button = _WhatsAppCtaButton(
+                          hovered: _hovered,
+                          expand: compact,
+                        );
 
-                  if (compact) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _SupportIcon(),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
+                        if (compact) {
+                          return Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const _SupportPanelText(),
-                              const SizedBox(height: 12),
-                              button,
+                              const _SupportIcon(),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const _SupportPanelText(),
+                                    const SizedBox(height: 12),
+                                    button,
+                                  ],
+                                ),
+                              ),
                             ],
-                          ),
-                        ),
-                      ],
-                    );
-                  }
+                          );
+                        }
 
-                  return Row(
-                    children: [
-                      const _SupportIcon(),
-                      const SizedBox(width: 14),
-                      const Expanded(child: _SupportPanelText()),
-                      const SizedBox(width: 16),
-                      button,
-                    ],
-                  );
-                },
+                        return Row(
+                          children: [
+                            const _SupportIcon(),
+                            const SizedBox(width: 14),
+                            const Expanded(child: _SupportPanelText()),
+                            const SizedBox(width: 16),
+                            button,
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  ),
-),
-);
-}
+    );
+  }
 }
 
 class _SupportIcon extends StatelessWidget {

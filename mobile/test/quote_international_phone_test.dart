@@ -4,7 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heliantha_mobile/features/quote/presentation/quote_form_screen.dart';
 
 void main() {
-  testWidgets('QuoteFormScreen renders WhatsApp phone input with Morocco +212 badge by default',
+  testWidgets(
+      'QuoteFormScreen renders WhatsApp phone input with Morocco +212 badge by default',
       (tester) async {
     tester.view.physicalSize = const Size(414 * 2, 896 * 2);
     tester.view.devicePixelRatio = 2.0;
@@ -73,5 +74,26 @@ void main() {
     // Now country badge is France 🇫🇷 and +33
     expect(find.text('🇫🇷'), findsOneWidget);
     expect(find.text('+33'), findsOneWidget);
+
+    final phoneField = find.widgetWithText(TextFormField, 'Numéro WhatsApp');
+    await tester.enterText(phoneField, '612345');
+    await tester.pump();
+    final phoneInput = tester.widget<EditableText>(
+      find.descendant(of: phoneField, matching: find.byType(EditableText)),
+    );
+    expect(phoneInput.focusNode.hasFocus, isTrue);
+
+    await tester.enterText(phoneField, '612345678');
+    await tester.pump();
+    expect(phoneInput.focusNode.hasFocus, isTrue);
+    expect(phoneInput.controller.text, '612345678');
+
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+    final cityField = find.widgetWithText(TextFormField, 'Ville');
+    final cityInput = tester.widget<EditableText>(
+      find.descendant(of: cityField, matching: find.byType(EditableText)),
+    );
+    expect(cityInput.focusNode.hasFocus, isTrue);
   });
 }

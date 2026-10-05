@@ -8,6 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../shared/theme/app_tokens.dart';
+import '../../../shared/utils/friendly_errors.dart';
+import '../../../shared/utils/money.dart';
 import '../../../shared/widgets/app_background.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_ui.dart';
@@ -15,6 +17,7 @@ import '../../../shared/widgets/brand_widgets.dart';
 import '../../assistant/presentation/widgets/ai_floating_orb.dart';
 import '../data/quote_repository.dart';
 import '../providers/quote_provider.dart';
+import 'widgets/quote_generating_overlay.dart';
 
 class QuoteFormScreen extends ConsumerStatefulWidget {
   const QuoteFormScreen({
@@ -29,6 +32,7 @@ class QuoteFormScreen extends ConsumerStatefulWidget {
 }
 
 class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
+  final _generatingOverlayController = OverlayPortalController();
   final _formKey = GlobalKey<FormState>();
   final _flowController = TextEditingController();
   final _hmtController = TextEditingController();
@@ -272,7 +276,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
       }
       if (res.totalTtc != null) {
         buffer.writeln(
-          'Prix total estimé : ${res.totalTtc!.toStringAsFixed(0)} MAD TTC.',
+          'Prix total estimé : ${formatMoney(res.totalTtc!, currency: 'MAD')} TTC.',
         );
       }
     }
@@ -288,89 +292,96 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   @override
   Widget build(BuildContext context) {
     final spec = _spec;
-    return Scaffold(
-      appBar: const AppTopBar(
-        subtitle: 'Étude • Installation • Maintenance',
-        showBack: true,
-        backFallbackLocation: '/quote',
+    return OverlayPortal(
+      controller: _generatingOverlayController,
+      overlayLocation: OverlayChildLocation.rootOverlay,
+      overlayChildBuilder: (_) => const Positioned.fill(
+        child: QuoteGeneratingOverlay(isVisible: true),
       ),
-      body: Stack(
-        children: [
-          // 1. Fond d'écran avec technicien solaire HeliAntha + texture satinée Apple
-          Positioned.fill(
-            child: Image.asset(
-              helianthaBackgroundAsset,
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-            ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.82),
-                    const Color(0xFFF8FAFC).withValues(alpha: 0.88),
-                    const Color(0xFFF1F5F9).withValues(alpha: 0.94),
-                  ],
-                ),
+      child: Scaffold(
+        appBar: const AppTopBar(
+          subtitle: 'Étude • Installation • Maintenance',
+          showBack: true,
+          backFallbackLocation: '/quote',
+        ),
+        body: Stack(
+          children: [
+            // 1. Fond d'écran avec technicien solaire HeliAntha + texture satinée Apple
+            Positioned.fill(
+              child: Image.asset(
+                helianthaBackgroundAsset,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
               ),
             ),
-          ),
-          // Halos lumineux subtils (Aurora blur)
-          Positioned(
-            top: -40,
-            right: -30,
-            child: IgnorePointer(
-              child: Container(
-                width: 220,
-                height: 220,
+            Positioned.fill(
+              child: DecoratedBox(
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.82),
+                      const Color(0xFFF8FAFC).withValues(alpha: 0.88),
+                      const Color(0xFFF1F5F9).withValues(alpha: 0.94),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            bottom: 100,
-            left: -40,
-            child: IgnorePointer(
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF38BDF8).withValues(alpha: 0.10),
+            // Halos lumineux subtils (Aurora blur)
+            Positioned(
+              top: -40,
+              right: -30,
+              child: IgnorePointer(
+                child: Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                  ),
                 ),
               ),
             ),
-          ),
-          // 2. Contenu scrollable (Wizard ou Résultat)
-          Positioned.fill(
-            child: _result == null ? _buildWizard(spec) : _buildResult(spec),
-          ),
-          // 3. Orbe IA flottant déplaçable avec contexte projet dynamique
-          Positioned.fill(
-            child: AiFloatingOrb(
-              initialBottomMargin: _result == null ? 18 : 24,
-              contextPrompt: _buildAssistantContext(spec),
+            Positioned(
+              bottom: 100,
+              left: -40,
+              child: IgnorePointer(
+                child: Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF38BDF8).withValues(alpha: 0.10),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
+            // 2. Contenu scrollable (Wizard ou Résultat)
+            Positioned.fill(
+              child: _result == null ? _buildWizard(spec) : _buildResult(spec),
+            ),
+            // 3. Orbe IA flottant déplaçable avec contexte projet dynamique
+            Positioned.fill(
+              child: AiFloatingOrb(
+                initialBottomMargin: _result == null ? 18 : 24,
+                contextPrompt: _buildAssistantContext(spec),
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: _result == null
+            ? _WizardBottomBar(
+                currentStep: _currentStep,
+                isLastStep: _isLastStep,
+                canContinue: _isCurrentStepComplete && !_submitting,
+                submitting: _submitting,
+                onBack: _goBack,
+                onNext: _goNext,
+              )
+            : null,
       ),
-      bottomNavigationBar: _result == null
-          ? _WizardBottomBar(
-              currentStep: _currentStep,
-              isLastStep: _isLastStep,
-              canContinue: _isCurrentStepComplete && !_submitting,
-              submitting: _submitting,
-              onBack: _goBack,
-              onNext: _goNext,
-            )
-          : null,
     );
   }
 
@@ -790,11 +801,6 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[0-9 +.-]')),
           ],
-          onChanged: (value) {
-            if (_isPhoneValidFor(value, _selectedCountry)) {
-              _cityFocus.requestFocus();
-            }
-          },
           onFieldSubmitted: (_) => _cityFocus.requestFocus(),
           validator: (value) {
             if (!_isPhoneValidFor(value ?? '', _selectedCountry)) {
@@ -934,7 +940,6 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     setState(() {
       _result = null;
       _currentStep = 0;
-      _selectedCountry = _kCountryDials.first;
     });
   }
 
@@ -952,6 +957,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
       _submitting = true;
       _result = null;
     });
+    _generatingOverlayController.show();
 
     final payload = QuoteRequestPayload(
       projectType: _spec.apiProjectType,
@@ -969,19 +975,21 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         return;
       }
       setState(() => _result = result);
-      AppFeedback.success(context, 'Devis calculé avec succès.');
+      AppFeedback.success(
+          context, 'Votre étude solaire a été calculée avec succès.');
     } on QuoteApiException catch (error) {
       if (!mounted) {
         return;
       }
-      AppFeedback.error(context, error.message);
-    } catch (_) {
+      AppFeedback.error(context, friendlyQuoteErrorMessage(error.message));
+    } catch (e) {
       if (!mounted) {
         return;
       }
-      AppFeedback.error(context, 'Impossible de calculer le devis.');
+      AppFeedback.error(context, friendlyQuoteErrorMessage(e));
     } finally {
       if (mounted) {
+        _generatingOverlayController.hide();
         setState(() => _submitting = false);
       }
     }
@@ -997,7 +1005,10 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         );
 
     if (resolvedUrl.isEmpty) {
-      AppFeedback.warning(context, 'Référence devis ou URL PDF indisponible.');
+      AppFeedback.warning(
+        context,
+        friendlyPdfErrorMessage(),
+      );
       return;
     }
 
@@ -1022,7 +1033,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
       }
     } on QuoteApiException catch (error) {
       if (mounted) {
-        AppFeedback.error(context, error.message);
+        AppFeedback.error(context, friendlyPdfErrorMessage(error));
       }
     } catch (_) {
       try {
@@ -1037,7 +1048,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         }
       } catch (_) {}
       if (mounted) {
-        AppFeedback.error(context, 'Impossible de télécharger le devis PDF.');
+        AppFeedback.error(context, friendlyPdfErrorMessage());
       }
     } finally {
       if (mounted) {
@@ -1816,12 +1827,17 @@ class _QuoteResultCardState extends State<_QuoteResultCard>
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Text(
-                          'Génération en cours...',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 15,
+                        const Flexible(
+                          child: Text(
+                            'Génération en cours...',
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                            ),
                           ),
                         ),
                       ] else ...[
@@ -1831,12 +1847,17 @@ class _QuoteResultCardState extends State<_QuoteResultCard>
                           size: 22,
                         ),
                         const SizedBox(width: 10),
-                        const Text(
-                          'Télécharger mon Devis Officiel (PDF)',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 15,
+                        const Flexible(
+                          child: Text(
+                            'Télécharger mon Devis Officiel (PDF)',
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                            ),
                           ),
                         ),
                       ],
@@ -2015,7 +2036,10 @@ class _TotalPanel extends StatelessWidget {
                 textBaseline: TextBaseline.alphabetic,
                 children: [
                   Text(
-                    total == null ? 'Non communiqué' : _formatMoney(total!),
+                    total == null
+                        ? 'Non communiqué'
+                        : formatMoney(total!,
+                            currency: 'MAD', includeCurrency: false),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 34,
@@ -2099,6 +2123,7 @@ class _SpecificationCapsule extends StatelessWidget {
               ),
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
@@ -2114,7 +2139,7 @@ class _SpecificationCapsule extends StatelessWidget {
                     size: 20,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(height: 12),
                 Text(
                   spec.title,
                   maxLines: 1,
@@ -2596,7 +2621,6 @@ class _InputField extends StatelessWidget {
     this.inputFormatters,
     this.suffixIcon,
     this.validator,
-    this.onChanged,
     this.onFieldSubmitted,
   });
 
@@ -2612,7 +2636,6 @@ class _InputField extends StatelessWidget {
   final List<TextInputFormatter>? inputFormatters;
   final Widget? suffixIcon;
   final FormFieldValidator<String>? validator;
-  final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onFieldSubmitted;
 
   @override
@@ -2624,7 +2647,6 @@ class _InputField extends StatelessWidget {
       textInputAction: textInputAction,
       textCapitalization: textCapitalization,
       inputFormatters: inputFormatters,
-      onChanged: onChanged,
       style: const TextStyle(
         color: Color(0xFF0F172A),
         fontWeight: FontWeight.w800,
@@ -2769,20 +2791,6 @@ class _QuoteFormSpec {
         );
     }
   }
-}
-
-String _formatMoney(double value) {
-  final fixed = value.toStringAsFixed(2);
-  final parts = fixed.split('.');
-  final buffer = StringBuffer();
-  for (var index = 0; index < parts.first.length; index++) {
-    final remaining = parts.first.length - index;
-    buffer.write(parts.first[index]);
-    if (remaining > 1 && remaining % 3 == 1) {
-      buffer.write(' ');
-    }
-  }
-  return '${buffer.toString()},${parts.last}';
 }
 
 String _formatCompactNumber(double value) {

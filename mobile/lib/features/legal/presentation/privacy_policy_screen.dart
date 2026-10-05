@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_tokens.dart';
 import '../../../shared/widgets/app_feedback.dart';
@@ -10,17 +11,15 @@ import '../../../shared/widgets/brand_widgets.dart';
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
 
-  static final Uri _emailUri = Uri(
-    scheme: 'mailto',
-    path: 'contact@heliantha.ma',
-  );
+  static final Uri _emailUri = AppConfig.supportEmailUri;
 
   static Future<void> _launchEmail(BuildContext context) async {
-    final opened = await launchUrl(_emailUri, mode: LaunchMode.externalApplication);
+    final opened =
+        await launchUrl(_emailUri, mode: LaunchMode.externalApplication);
     if (!opened && context.mounted) {
-      AppFeedback.error(
+      AppFeedback.info(
         context,
-        'Impossible d’ouvrir le client mail (contact@heliantha.ma).',
+        'Impossible d’ouvrir votre messagerie automatiquement. Vous pouvez nous écrire à ${AppConfig.supportEmail}.',
       );
     }
   }
@@ -59,10 +58,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Les données sont traitées par :',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                         const SizedBox(height: 12),
                         Container(
@@ -99,7 +99,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 10),
                               _EmailButton(
-                                email: 'contact@heliantha.ma',
+                                email: AppConfig.supportEmail,
                                 onTap: () => _launchEmail(context),
                               ),
                             ],
@@ -120,28 +120,38 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Selon les fonctionnalités utilisées, Heliantha peut collecter notamment :',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                         const SizedBox(height: 12),
                         const _BulletItem(text: 'nom et prénom ;'),
                         const _BulletItem(text: 'adresse email ;'),
                         const _BulletItem(text: 'numéro de téléphone ;'),
-                        const _BulletItem(text: 'informations du compte client ;'),
-                        const _BulletItem(text: 'adresses de livraison et de facturation ;'),
-                        const _BulletItem(text: 'informations relatives aux commandes et à leur historique ;'),
+                        const _BulletItem(
+                            text: 'informations du compte client ;'),
+                        const _BulletItem(
+                            text: 'adresses de livraison et de facturation ;'),
+                        const _BulletItem(
+                            text:
+                                'informations relatives aux commandes et à leur historique ;'),
                         const _BulletItem(text: 'produits favoris ;'),
-                        const _BulletItem(text: 'informations nécessaires au suivi des commandes ;'),
-                        const _BulletItem(text: 'identifiants techniques nécessaires à l’envoi de notifications.'),
+                        const _BulletItem(
+                            text:
+                                'informations nécessaires au suivi des commandes ;'),
+                        const _BulletItem(
+                            text:
+                                'identifiants techniques nécessaires à l’envoi de notifications.'),
                         const SizedBox(height: 12),
                         const _HighlightBox(
                           icon: Icons.security_rounded,
                           color: AppColors.leaf,
                           backgroundColor: AppColors.softLeaf,
                           title: 'Sécurité bancaire',
-                          text: 'Heliantha ne stocke pas les coordonnées bancaires des utilisateurs dans l’application mobile.',
+                          text:
+                              'Heliantha ne stocke pas les coordonnées bancaires des utilisateurs dans l’application mobile.',
                         ),
                       ],
                     ),
@@ -158,29 +168,44 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Les données collectées sont utilisées notamment pour :',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                         const SizedBox(height: 12),
-                        const _BulletItem(text: 'créer et gérer le compte client ;'),
-                        const _BulletItem(text: 'traiter et suivre les commandes ;'),
-                        const _BulletItem(text: 'organiser la livraison ou le retrait des produits ;'),
+                        const _BulletItem(
+                            text: 'créer et gérer le compte client ;'),
+                        const _BulletItem(
+                            text: 'traiter et suivre les commandes ;'),
+                        const _BulletItem(
+                            text:
+                                'organiser la livraison ou le retrait des produits ;'),
                         const _BulletItem(text: 'gérer les favoris ;'),
-                        const _BulletItem(text: 'fournir le service après-vente ;'),
-                        const _BulletItem(text: 'informer le client de l’évolution de ses commandes ;'),
-                        const _BulletItem(text: 'envoyer des notifications utiles relatives au compte, aux commandes ou aux produits ;'),
-                        const _BulletItem(text: 'assurer la sécurité et le bon fonctionnement des services ;'),
-                        const _BulletItem(text: 'répondre aux demandes adressées au service client.'),
+                        const _BulletItem(
+                            text: 'fournir le service après-vente ;'),
+                        const _BulletItem(
+                            text:
+                                'informer le client de l’évolution de ses commandes ;'),
+                        const _BulletItem(
+                            text:
+                                'envoyer des notifications utiles relatives au compte, aux commandes ou aux produits ;'),
+                        const _BulletItem(
+                            text:
+                                'assurer la sécurité et le bon fonctionnement des services ;'),
+                        const _BulletItem(
+                            text:
+                                'répondre aux demandes adressées au service client.'),
                         const SizedBox(height: 12),
                         Text(
                           'Les données ne sont pas utilisées à des fins étrangères aux services proposés par Heliantha sans information ou consentement approprié de l’utilisateur.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.muted,
-                                height: 1.45,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.muted,
+                                    height: 1.45,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
                       ],
                     ),
@@ -197,24 +222,33 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       children: [
                         Text(
                           'L’application HELIANTHA peut envoyer des notifications concernant notamment :',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                         const SizedBox(height: 12),
-                        const _BulletItem(text: 'la confirmation d’une commande ;'),
-                        const _BulletItem(text: 'la préparation ou l’évolution d’une commande ;'),
-                        const _BulletItem(text: 'les informations relatives au paiement ;'),
-                        const _BulletItem(text: 'le retour en stock de certains produits ;'),
-                        const _BulletItem(text: 'd’autres informations directement liées aux services Heliantha.'),
+                        const _BulletItem(
+                            text: 'la confirmation d’une commande ;'),
+                        const _BulletItem(
+                            text:
+                                'la préparation ou l’évolution d’une commande ;'),
+                        const _BulletItem(
+                            text: 'les informations relatives au paiement ;'),
+                        const _BulletItem(
+                            text: 'le retour en stock de certains produits ;'),
+                        const _BulletItem(
+                            text:
+                                'd’autres informations directement liées aux services Heliantha.'),
                         const SizedBox(height: 12),
                         const _HighlightBox(
                           icon: Icons.cloud_done_rounded,
                           color: AppColors.blue,
                           backgroundColor: AppColors.softBlue,
                           title: 'Google Firebase',
-                          text: 'Pour permettre l’envoi de notifications sur Android, l’application utilise Firebase Cloud Messaging, un service fourni par Google.',
+                          text:
+                              'Pour permettre l’envoi de notifications sur Android, l’application utilise Firebase Cloud Messaging, un service fourni par Google.',
                         ),
                       ],
                     ),
@@ -231,23 +265,32 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Les données peuvent être traitées par les services techniques nécessaires au fonctionnement de l’application, notamment :',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                         const SizedBox(height: 12),
-                        const _BulletItem(text: 'l’infrastructure e-commerce PrestaShop ;'),
-                        const _BulletItem(text: 'les infrastructures d’hébergement utilisées par Heliantha ;'),
-                        const _BulletItem(text: 'Google Firebase pour les notifications mobiles ;'),
-                        const _BulletItem(text: 'les prestataires nécessaires à la livraison des commandes lorsque cela est requis.'),
+                        const _BulletItem(
+                            text: 'l’infrastructure e-commerce PrestaShop ;'),
+                        const _BulletItem(
+                            text:
+                                'les infrastructures d’hébergement utilisées par Heliantha ;'),
+                        const _BulletItem(
+                            text:
+                                'Google Firebase pour les notifications mobiles ;'),
+                        const _BulletItem(
+                            text:
+                                'les prestataires nécessaires à la livraison des commandes lorsque cela est requis.'),
                         const SizedBox(height: 12),
                         const _HighlightBox(
                           icon: Icons.verified_user_rounded,
                           color: AppColors.leaf,
                           backgroundColor: AppColors.softLeaf,
                           title: 'Engagement de confidentialité',
-                          text: 'Heliantha ne vend pas les données personnelles de ses utilisateurs.',
+                          text:
+                              'Heliantha ne vend pas les données personnelles de ses utilisateurs.',
                         ),
                       ],
                     ),
@@ -264,10 +307,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Heliantha met en œuvre des mesures techniques et organisationnelles destinées à protéger les informations personnelles contre l’accès non autorisé, la perte, la modification ou la divulgation.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                         const SizedBox(height: 12),
                         const _HighlightBox(
@@ -275,7 +319,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
                           color: AppColors.navy,
                           backgroundColor: AppColors.surfaceMuted,
                           title: 'Chiffrement HTTPS',
-                          text: 'Les communications avec les services en ligne Heliantha sont protégées notamment au moyen du protocole HTTPS.',
+                          text:
+                              'Les communications avec les services en ligne Heliantha sont protégées notamment au moyen du protocole HTTPS.',
                         ),
                       ],
                     ),
@@ -292,18 +337,20 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Les données sont conservées pendant la durée nécessaire à la gestion du compte, des commandes, du service client et au respect des obligations légales et comptables applicables.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                         const SizedBox(height: 10),
                         Text(
                           'Certaines informations liées aux commandes peuvent être conservées plus longtemps lorsque la réglementation l’impose.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                       ],
                     ),
@@ -369,14 +416,15 @@ class PrivacyPolicyScreen extends StatelessWidget {
                         const SizedBox(height: 14),
                         Text(
                           'Pour exercer ces droits :',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                fontWeight: FontWeight.w700,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                         ),
                         const SizedBox(height: 8),
                         _EmailButton(
-                          email: 'contact@heliantha.ma',
+                          email: AppConfig.supportEmail,
                           onTap: () => _launchEmail(context),
                         ),
                       ],
@@ -394,24 +442,26 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Un utilisateur peut demander la suppression de son compte HELIANTHA et des données personnelles qui lui sont associées en adressant une demande à :',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                         const SizedBox(height: 10),
                         _EmailButton(
-                          email: 'contact@heliantha.ma',
+                          email: AppConfig.supportEmail,
                           onTap: () => _launchEmail(context),
                         ),
                         const SizedBox(height: 12),
                         Text(
                           'Certaines informations peuvent toutefois être conservées lorsqu’elles sont nécessaires au respect d’une obligation légale, comptable ou à la résolution d’un litige.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.muted,
-                                height: 1.45,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.muted,
+                                    height: 1.45,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
                       ],
                     ),
@@ -428,18 +478,20 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Certains services techniques peuvent traiter des informations nécessaires au fonctionnement de l’application, notamment Google Firebase pour les notifications.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                         const SizedBox(height: 10),
                         Text(
                           'Ces prestataires disposent de leurs propres politiques et mesures de protection des données.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                       ],
                     ),
@@ -456,19 +508,21 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Heliantha peut modifier la présente politique afin de tenir compte de l’évolution de ses services, de l’application ou de la réglementation applicable.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.ink,
-                                height: 1.5,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.ink,
+                                    height: 1.5,
+                                  ),
                         ),
                         const SizedBox(height: 10),
                         Text(
                           'La date de dernière mise à jour est indiquée en haut de cette page.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.muted,
-                                height: 1.45,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.muted,
+                                    height: 1.45,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
                       ],
                     ),
@@ -517,7 +571,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 10),
                               _EmailButton(
-                                email: 'contact@heliantha.ma',
+                                email: AppConfig.supportEmail,
                                 onTap: () => _launchEmail(context),
                               ),
                             ],
@@ -584,11 +638,12 @@ class _HeaderCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       'Politique de confidentialité',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.3,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.3,
+                              ),
                     ),
                   ],
                 ),
@@ -835,11 +890,11 @@ class _EmailButton extends StatelessWidget {
                   ),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.open_in_new_rounded, size: 14, color: AppColors.blue),
+            const Icon(Icons.open_in_new_rounded,
+                size: 14, color: AppColors.blue),
           ],
         ),
       ),
     );
   }
 }
-

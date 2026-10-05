@@ -26,16 +26,24 @@ final selectedCurrencyIdProvider =
 
 class SelectedLanguageIdNotifier extends StateNotifier<int?> {
   SelectedLanguageIdNotifier(this._repository) : super(null) {
-    _load();
+    ready = _load();
   }
 
   final StoreContextRepository _repository;
+  late final Future<void> ready;
+  bool _selected = false;
 
   Future<void> _load() async {
-    state = await _repository.readLanguageId();
+    try {
+      final saved = await _repository.readLanguageId();
+      if (mounted && !_selected) state = saved;
+    } catch (_) {
+      // Keep the default selection when local storage is unavailable.
+    }
   }
 
   Future<void> select(int id) async {
+    _selected = true;
     state = id;
     await _repository.saveLanguageId(id);
   }
@@ -43,16 +51,24 @@ class SelectedLanguageIdNotifier extends StateNotifier<int?> {
 
 class SelectedCurrencyIdNotifier extends StateNotifier<int?> {
   SelectedCurrencyIdNotifier(this._repository) : super(null) {
-    _load();
+    ready = _load();
   }
 
   final StoreContextRepository _repository;
+  late final Future<void> ready;
+  bool _selected = false;
 
   Future<void> _load() async {
-    state = await _repository.readCurrencyId();
+    try {
+      final saved = await _repository.readCurrencyId();
+      if (mounted && !_selected) state = saved;
+    } catch (_) {
+      // Keep the default selection when local storage is unavailable.
+    }
   }
 
   Future<void> select(int id) async {
+    _selected = true;
     state = id;
     await _repository.saveCurrencyId(id);
   }
