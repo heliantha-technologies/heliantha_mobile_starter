@@ -45,7 +45,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   bool _loading = true;
   bool _loadingMore = false;
   Object? _error;
-  int _requestVersion = 0;
+  int _currentSearchRequestId = 0;
   Timer? _searchDebounce;
   bool _openedCategoriesFromRoute = false;
   bool _showSmartScrollButton = false;
@@ -187,7 +187,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
   Future<void> _loadFirstPage() async {
     _searchDebounce?.cancel();
-    final requestVersion = ++_requestVersion;
+    final requestId = ++_currentSearchRequestId;
     setState(() {
       _loading = true;
       _loadingMore = false;
@@ -209,7 +209,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         currencyId: selection.currencyId,
       );
       if (mounted) {
-        if (requestVersion != _requestVersion) {
+        if (requestId != _currentSearchRequestId) {
           return;
         }
         setState(() {
@@ -230,11 +230,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         }
       }
     } catch (error) {
-      if (mounted && requestVersion == _requestVersion) {
+      if (mounted && requestId == _currentSearchRequestId) {
         setState(() => _error = error);
       }
     } finally {
-      if (mounted && requestVersion == _requestVersion) {
+      if (mounted && requestId == _currentSearchRequestId) {
         setState(() => _loading = false);
       }
     }
@@ -245,6 +245,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       return;
     }
 
+    final requestId = ++_currentSearchRequestId;
     setState(() => _loadingMore = true);
     try {
       final repo = ref.read(catalogRepositoryProvider);
@@ -258,7 +259,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         languageId: selection.languageId,
         currencyId: selection.currencyId,
       );
-      if (mounted) {
+      if (mounted && requestId == _currentSearchRequestId) {
         setState(() {
           _products = [...?_products, ...rows];
           _page = nextPage;
@@ -267,7 +268,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         _loadMoreIfContentIsShort();
       }
     } catch (e) {
-      if (!mounted) {
+      if (!mounted || requestId != _currentSearchRequestId) {
         return;
       }
       AppFeedback.error(
@@ -275,7 +276,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         'Nous n’avons pas pu charger plus de produits pour le moment.',
       );
     } finally {
-      if (mounted) {
+      if (mounted && requestId == _currentSearchRequestId) {
         setState(() => _loadingMore = false);
       }
     }
@@ -416,12 +417,18 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     }
 
     final actions = <Widget>[];
+    final currentLanguageId = ref.watch(selectedLanguageIdProvider);
+    final currentCurrencyId = ref.watch(selectedCurrencyIdProvider);
 
     if (context.languages.length > 1) {
       actions.add(
         PopupMenuButton<int>(
           tooltip: 'Langue',
-          icon: const Icon(Icons.language_rounded),
+          offset: const Offset(0, 42),
+          elevation: 6,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          color: Colors.white,
           onSelected: (id) async {
             await ref.read(selectedLanguageIdProvider.notifier).select(id);
             await _loadFirstPage();
@@ -430,9 +437,36 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             for (final language in context.languages)
               PopupMenuItem<int>(
                 value: language.id,
-                child: Text(language.name),
+                child: Row(
+                  children: [
+                    Text(
+                      language.name,
+                      style: TextStyle(
+                        fontWeight: language.id == currentLanguageId
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: language.id == currentLanguageId
+                            ? AppColors.navy
+                            : const Color(0xFF334155),
+                      ),
+                    ),
+                    if (language.id == currentLanguageId) ...[
+                      const Spacer(),
+                      const Icon(Icons.check_rounded,
+                          size: 18, color: Color(0xFF7C3AED)),
+                    ],
+                  ],
+                ),
               ),
           ],
+          child: const TopBarActionPastille(
+            icon: Icons.language_rounded,
+            iconColor: Color(0xFF7C3AED),
+            backgroundColor: Color(0xFFEDE9FE),
+            gradientColors: [Color(0xFFF5F3FF), Color(0xFFEDE9FE)],
+            borderColor: Color(0xFF7C3AED),
+            shadowColor: Color(0xFF7C3AED),
+          ),
         ),
       );
     }
@@ -441,7 +475,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       actions.add(
         PopupMenuButton<int>(
           tooltip: 'Devise',
-          icon: const Icon(Icons.payments_rounded),
+          offset: const Offset(0, 42),
+          elevation: 6,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          color: Colors.white,
           onSelected: (id) async {
             await ref.read(selectedCurrencyIdProvider.notifier).select(id);
             await _loadFirstPage();
@@ -450,9 +488,36 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             for (final currency in context.currencies)
               PopupMenuItem<int>(
                 value: currency.id,
-                child: Text(currency.isoCode),
+                child: Row(
+                  children: [
+                    Text(
+                      currency.isoCode,
+                      style: TextStyle(
+                        fontWeight: currency.id == currentCurrencyId
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: currency.id == currentCurrencyId
+                            ? AppColors.navy
+                            : const Color(0xFF334155),
+                      ),
+                    ),
+                    if (currency.id == currentCurrencyId) ...[
+                      const Spacer(),
+                      const Icon(Icons.check_rounded,
+                          size: 18, color: Color(0xFFD97706)),
+                    ],
+                  ],
+                ),
               ),
           ],
+          child: const TopBarActionPastille(
+            icon: Icons.payments_rounded,
+            iconColor: Color(0xFFD97706),
+            backgroundColor: Color(0xFFFEF3C7),
+            gradientColors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+            borderColor: Color(0xFFF59E0B),
+            shadowColor: Color(0xFFD97706),
+          ),
         ),
       );
     }

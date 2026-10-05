@@ -37,6 +37,12 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   final _phoneController = TextEditingController();
   final _cityController = TextEditingController();
 
+  final _nameFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+  final _cityFocus = FocusNode();
+
+  _CountryDial _selectedCountry = _kCountryDials.first;
+
   int _currentStep = 0;
   bool? _pumpExisting;
   bool _submitting = false;
@@ -126,10 +132,9 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
 
   bool get _isContactComplete {
     final name = _nameController.text.trim();
-    final phone = _compactPhone(_phoneController.text);
     final city = _cityController.text.trim();
     return name.length >= 2 &&
-        RegExp(r'^0[567]\d{8}$').hasMatch(phone) &&
+        _isPhoneValidFor(_phoneController.text, _selectedCountry) &&
         city.isNotEmpty;
   }
 
@@ -150,6 +155,9 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
 
   @override
   void dispose() {
+    _nameFocus.dispose();
+    _phoneFocus.dispose();
+    _cityFocus.dispose();
     for (final controller in [
       _flowController,
       _hmtController,
@@ -180,7 +188,8 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
 
     switch (_kind) {
       case _QuoteProjectKind.pumping:
-        buffer.writeln('Type : Pompage Solaire (Forage / Irrigation / Bassin).');
+        buffer
+            .writeln('Type : Pompage Solaire (Forage / Irrigation / Bassin).');
         if (_pumpExisting != null) {
           buffer.writeln(
             _pumpExisting == true
@@ -206,7 +215,8 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         break;
 
       case _QuoteProjectKind.photovoltaic:
-        buffer.writeln('Type : Autoconsommation Photovoltaïque (Réduction de facture ONEE).');
+        buffer.writeln(
+            'Type : Autoconsommation Photovoltaïque (Réduction de facture ONEE).');
         if (_consumptionController.text.trim().isNotEmpty) {
           buffer.writeln(
             'Consommation mensuelle : ${_consumptionController.text.trim()} kWh/mois.',
@@ -221,7 +231,8 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         break;
 
       case _QuoteProjectKind.hybrid:
-        buffer.writeln('Type : Solaire Hybride avec Stockage Batteries (Off-Grid / Secours).');
+        buffer.writeln(
+            'Type : Solaire Hybride avec Stockage Batteries (Off-Grid / Secours).');
         if (_consumptionController.text.trim().isNotEmpty) {
           buffer.writeln(
             'Consommation mensuelle : ${_consumptionController.text.trim()} kWh.',
@@ -239,7 +250,8 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
 
     if (_result != null) {
       final res = _result!;
-      buffer.writeln('--- Dimensionnement calculé par l\'algorithme Heliantha ---');
+      buffer.writeln(
+          '--- Dimensionnement calculé par l\'algorithme Heliantha ---');
       if (res.quoteNumber != null) {
         buffer.writeln('Numéro de devis : ${res.quoteNumber}.');
       }
@@ -249,7 +261,8 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         );
       }
       if (res.panelCount != null) {
-        buffer.writeln('Nombre de panneaux solaires : ${res.panelCount} panneaux.');
+        buffer.writeln(
+            'Nombre de panneaux solaires : ${res.panelCount} panneaux.');
       }
       if (res.inverter != null) {
         buffer.writeln('Onduleur ou variateur solaire : ${res.inverter}.');
@@ -362,51 +375,55 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   }
 
   Widget _buildWizard(_QuoteFormSpec spec) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      children: [
-        ResponsivePagePadding(
-          bottom: 28,
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _WizardHeader(
-                  spec: spec,
-                  currentStep: _currentStep,
-                  totalSteps: _totalSteps,
-                  onClose: _closeWizard,
-                ),
-                const SizedBox(height: 16),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 240),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeOutCubic,
-                  transitionBuilder: (child, animation) {
-                    final offsetAnimation = Tween<Offset>(
-                      begin: const Offset(0.04, 0),
-                      end: Offset.zero,
-                    ).animate(animation);
-                    return FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: offsetAnimation,
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: KeyedSubtree(
-                    key: ValueKey('${_kind.name}-$_currentStep'),
-                    child: _buildStepCard(),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: ListView(
+        padding: EdgeInsets.zero,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        children: [
+          ResponsivePagePadding(
+            bottom: 120,
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _WizardHeader(
+                    spec: spec,
+                    currentStep: _currentStep,
+                    totalSteps: _totalSteps,
+                    onClose: _closeWizard,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 240),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeOutCubic,
+                    transitionBuilder: (child, animation) {
+                      final offsetAnimation = Tween<Offset>(
+                        begin: const Offset(0.04, 0),
+                        end: Offset.zero,
+                      ).animate(animation);
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: offsetAnimation,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: KeyedSubtree(
+                      key: ValueKey('${_kind.name}-$_currentStep'),
+                      child: _buildStepCard(),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -439,46 +456,32 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   Widget _buildStepCard() {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(26),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(26),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.90),
-                width: 1.2,
-              ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SectionTitle(
+              title: _stepTitle,
+              subtitle: _stepSubtitle,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _SectionTitle(
-                  title: _stepTitle,
-                  subtitle: _stepSubtitle,
-                ),
-                const SizedBox(height: 18),
-                _buildCurrentStepContent(),
-              ],
-            ),
-          ),
+            const SizedBox(height: 12),
+            _buildCurrentStepContent(),
+          ],
         ),
       ),
     );
@@ -533,12 +536,16 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(
-                'Puissance de la pompe (CV) :',
-                style: TextStyle(
-                  color: const Color(0xFF0F172A),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14.5,
+              Expanded(
+                child: Text(
+                  'Puissance de la pompe (CV) :',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: const Color(0xFF0F172A),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                  ),
                 ),
               ),
             ],
@@ -720,15 +727,20 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   }
 
   Widget _buildContactFields() {
+    final phoneValid =
+        _isPhoneValidFor(_phoneController.text, _selectedCountry);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _InputField(
           controller: _nameController,
+          focusNode: _nameFocus,
           label: 'Nom complet',
           icon: Icons.person_outline_rounded,
           textCapitalization: TextCapitalization.words,
           textInputAction: TextInputAction.next,
+          onFieldSubmitted: (_) => _phoneFocus.requestFocus(),
           validator: (value) {
             final text = value?.trim() ?? '';
             if (text.length < 2) {
@@ -737,28 +749,66 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
             return null;
           },
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         _InputField(
           controller: _phoneController,
-          label: 'Numéro de téléphone',
-          hintText: '06XXXXXXXX',
-          icon: Icons.phone_outlined,
+          focusNode: _phoneFocus,
+          label: 'Numéro WhatsApp',
+          hintText: _selectedCountry.hint,
+          icon: Icons.chat_rounded,
+          prefixWidget: _CountryPickerButton(
+            country: _selectedCountry,
+            onTap: _showCountryPickerModal,
+          ),
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
+          suffixIcon: phoneValid
+              ? IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFECFDF5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: Color(0xFF059669),
+                    ),
+                  ),
+                  tooltip: 'Passer à la Ville',
+                  onPressed: () => _cityFocus.requestFocus(),
+                )
+              : const Padding(
+                  padding: EdgeInsets.only(right: 14),
+                  child: Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 18,
+                    color: Color(0xFF10B981),
+                  ),
+                ),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[0-9 +.-]')),
           ],
+          onChanged: (value) {
+            if (_isPhoneValidFor(value, _selectedCountry)) {
+              _cityFocus.requestFocus();
+            }
+          },
+          onFieldSubmitted: (_) => _cityFocus.requestFocus(),
           validator: (value) {
-            final phone = _compactPhone(value ?? '');
-            if (!RegExp(r'^0[567]\d{8}$').hasMatch(phone)) {
-              return 'Numéro marocain valide requis : 05, 06 ou 07.';
+            if (!_isPhoneValidFor(value ?? '', _selectedCountry)) {
+              return _selectedCountry.dialCode == '+212'
+                  ? 'Numéro marocain requis (ex: ${_selectedCountry.hint})'
+                  : 'Numéro WhatsApp valide requis (${_selectedCountry.dialCode})';
             }
             return null;
           },
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         _InputField(
           controller: _cityController,
+          focusNode: _cityFocus,
           label: 'Ville',
           icon: Icons.location_city_outlined,
           textCapitalization: TextCapitalization.words,
@@ -770,6 +820,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
             return null;
           },
           onFieldSubmitted: (_) {
+            FocusScope.of(context).unfocus();
             if (_isLastStep && _isCurrentStepComplete && !_submitting) {
               _submit();
             }
@@ -883,6 +934,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     setState(() {
       _result = null;
       _currentStep = 0;
+      _selectedCountry = _kCountryDials.first;
     });
   }
 
@@ -906,14 +958,13 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
       data: _buildPayloadData(),
       contact: QuoteContact(
         name: _nameController.text.trim(),
-        phone: _compactPhone(_phoneController.text),
+        phone: _fullInternationalPhone,
         city: _cityController.text.trim(),
       ),
     );
 
     try {
-      final result =
-          await ref.read(quoteRepositoryProvider).calculate(payload);
+      final result = await ref.read(quoteRepositoryProvider).calculate(payload);
       if (!mounted) {
         return;
       }
@@ -959,7 +1010,9 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
       );
       if (!launched) {
         if (quoteNumber != null && quoteNumber.isNotEmpty) {
-          await ref.read(quoteRepositoryProvider).downloadAndOpenPdf(quoteNumber);
+          await ref
+              .read(quoteRepositoryProvider)
+              .downloadAndOpenPdf(quoteNumber);
         } else {
           throw const QuoteApiException('Impossible d\'ouvrir le devis PDF.');
         }
@@ -974,7 +1027,9 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
     } catch (_) {
       try {
         if (quoteNumber != null && quoteNumber.isNotEmpty) {
-          await ref.read(quoteRepositoryProvider).downloadAndOpenPdf(quoteNumber);
+          await ref
+              .read(quoteRepositoryProvider)
+              .downloadAndOpenPdf(quoteNumber);
           if (mounted) {
             AppFeedback.success(context, 'PDF enregistré.');
           }
@@ -1045,16 +1100,59 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
   }
 
   static double? _parseNumber(String value) {
-    final normalized =
-        value.trim().replaceAll(' ', '').replaceAll(',', '.');
+    final normalized = value.trim().replaceAll(' ', '').replaceAll(',', '.');
     if (normalized.isEmpty) {
       return null;
     }
     return double.tryParse(normalized);
   }
 
-  static String _compactPhone(String value) {
-    return value.replaceAll(RegExp(r'[\s+.-]'), '');
+  String get _fullInternationalPhone {
+    final digits =
+        _cleanNationalDigits(_phoneController.text, _selectedCountry);
+    if (digits.isEmpty) {
+      return '';
+    }
+    return '${_selectedCountry.dialCode}$digits';
+  }
+
+  static String _cleanNationalDigits(String value, _CountryDial country) {
+    var digits = value.replaceAll(RegExp(r'\D'), '');
+    final dialDigits = country.dialCode.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith(dialDigits)) {
+      digits = digits.substring(dialDigits.length);
+    }
+    if (digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    return digits;
+  }
+
+  static bool _isPhoneValidFor(String value, _CountryDial country) {
+    final digits = _cleanNationalDigits(value, country);
+    if (country.dialCode == '+212') {
+      return RegExp(r'^[5-8]\d{8}$').hasMatch(digits);
+    }
+    return digits.length >= 6 && digits.length <= 13;
+  }
+
+  Future<void> _showCountryPickerModal() async {
+    FocusScope.of(context).unfocus();
+    final picked = await showModalBottomSheet<_CountryDial>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _CountryPickerSheet(
+        selectedCountry: _selectedCountry,
+      ),
+    );
+
+    if (picked != null && picked != _selectedCountry && mounted) {
+      setState(() {
+        _selectedCountry = picked;
+      });
+      _phoneFocus.requestFocus();
+    }
   }
 }
 
@@ -1078,167 +1176,158 @@ class _WizardHeader extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.08),
-            blurRadius: 22,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.90),
-                width: 1.2,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFEF3C7),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        spec.icon,
-                        color: spec.accent,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            spec.title.toUpperCase(),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: const Color(0xFF0F172A),
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            spec.subtitle,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: const Color(0xFF475569),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Fermer',
-                      onPressed: onClose,
-                      style: IconButton.styleFrom(
-                        backgroundColor:
-                            const Color(0xFFF1F5F9).withValues(alpha: 0.8),
-                      ),
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: Color(0xFF0F172A),
-                        size: 19,
-                      ),
-                    ),
-                  ],
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF3C7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    spec.icon,
+                    color: spec.accent,
+                    size: 20,
+                  ),
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    // Badge "Étape X sur Y" : capsule Bleu Nuit & Or
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color:
-                              const Color(0xFFF59E0B).withValues(alpha: 0.4),
-                          width: 1,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        spec.title.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          letterSpacing: 0.3,
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.bolt_rounded,
-                            color: Color(0xFFF59E0B),
-                            size: 13,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Étape ${currentStep + 1} sur $totalSteps',
-                            style: const TextStyle(
-                              color: Color(0xFFF59E0B),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '$percent %',
-                      style: const TextStyle(
-                        color: Color(0xFF0F172A),
-                        fontWeight: FontWeight.w900,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Barre de progression dégradé Jaune Solaire HeliAntha (hauteur 4px, rayon 10px)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    height: 4,
-                    width: double.infinity,
-                    color: const Color(0xFFE2E8F0),
-                    alignment: Alignment.centerLeft,
-                    child: FractionallySizedBox(
-                      widthFactor: progress.clamp(0.0, 1.0),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFF59E0B), Color(0xFFFBBF24)],
-                          ),
-                          borderRadius: BorderRadius.circular(10),
+                      const SizedBox(height: 2),
+                      Text(
+                        spec.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF475569),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11.5,
                         ),
                       ),
-                    ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Fermer',
+                  onPressed: onClose,
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                    backgroundColor:
+                        const Color(0xFFF1F5F9).withValues(alpha: 0.8),
+                  ),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF0F172A),
+                    size: 18,
                   ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                // Badge "Étape X sur Y" : capsule Bleu Nuit & Or
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.bolt_rounded,
+                        color: Color(0xFFF59E0B),
+                        size: 13,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Étape ${currentStep + 1} sur $totalSteps',
+                        style: const TextStyle(
+                          color: Color(0xFFF59E0B),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '$percent %',
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Barre de progression dégradé Jaune Solaire HeliAntha (hauteur 4px, rayon 10px)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                height: 4,
+                width: double.infinity,
+                color: const Color(0xFFE2E8F0),
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: progress.clamp(0.0, 1.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFF59E0B), Color(0xFFFBBF24)],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1264,87 +1353,93 @@ class _WizardBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.88),
-            border: const Border(
-              top: BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(
+          top: BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                children: [
-                  if (currentStep > 0) ...[
-                    _TactilePressScale(
-                      enabled: !submitting,
-                      child: OutlinedButton.icon(
-                        onPressed: submitting ? null : onBack,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(100, 56),
-                          backgroundColor:
-                              Colors.white.withValues(alpha: 0.85),
-                          foregroundColor: const Color(0xFF0F172A),
-                          side: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                            width: 1.2,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                        ),
-                        icon: const Icon(
-                          Icons.arrow_back_rounded,
-                          size: 19,
-                        ),
-                        label: const Text(
-                          'Retour',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+          child: Row(
+            children: [
+              if (currentStep > 0) ...[
+                _TactilePressScale(
+                  enabled: !submitting,
+                  child: OutlinedButton.icon(
+                    onPressed: submitting ? null : onBack,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(96, 52),
+                      backgroundColor: Colors.white.withValues(alpha: 0.85),
+                      foregroundColor: const Color(0xFF0F172A),
+                      side: const BorderSide(
+                        color: Color(0xFFE2E8F0),
+                        width: 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: _TactilePressScale(
-                      enabled: canContinue,
-                      child: Container(
-                        height: 56,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
-                          gradient: canContinue
-                              ? const LinearGradient(
-                                  colors: [
-                                    Color(0xFF0F172A),
-                                    Color(0xFF1E293B),
-                                  ],
-                                )
-                              : null,
-                          color: canContinue
-                              ? null
-                              : const Color(0xFFCBD5E1),
-                          boxShadow: canContinue
-                              ? [
-                                  BoxShadow(
-                                    color: const Color(0xFF0F172A)
-                                        .withValues(alpha: 0.35),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(22),
-                            onTap: canContinue ? onNext : null,
-                            child: Center(
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      size: 19,
+                    ),
+                    label: const Text(
+                      'Retour',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: _TactilePressScale(
+                  enabled: canContinue,
+                  child: Container(
+                    height: 52,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      gradient: canContinue
+                          ? const LinearGradient(
+                              colors: [
+                                Color(0xFF0F172A),
+                                Color(0xFF1E293B),
+                              ],
+                            )
+                          : null,
+                      color: canContinue ? null : const Color(0xFFCBD5E1),
+                      boxShadow: canContinue
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF0F172A)
+                                    .withValues(alpha: 0.35),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: canContinue ? onNext : null,
+                        child: Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
@@ -1394,9 +1489,9 @@ class _WizardBottomBar extends StatelessWidget {
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -2179,9 +2274,7 @@ class _ChoiceTile<T> extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  isSelected
-                      ? Icons.check_circle_rounded
-                      : option.icon,
+                  isSelected ? Icons.check_circle_rounded : option.icon,
                   color: isSelected
                       ? const Color(0xFFF59E0B)
                       : const Color(0xFF475569),
@@ -2454,7 +2547,7 @@ class _NumberField extends StatelessWidget {
         fillColor: Colors.white.withValues(alpha: 0.90),
         prefixIcon: Icon(icon, color: const Color(0xFF0F172A), size: 21),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(
@@ -2494,34 +2587,44 @@ class _InputField extends StatelessWidget {
     required this.controller,
     required this.label,
     required this.icon,
+    this.focusNode,
     this.hintText,
+    this.prefixWidget,
     this.keyboardType,
     this.textInputAction,
     this.textCapitalization = TextCapitalization.none,
     this.inputFormatters,
+    this.suffixIcon,
     this.validator,
+    this.onChanged,
     this.onFieldSubmitted,
   });
 
   final TextEditingController controller;
   final String label;
   final IconData icon;
+  final FocusNode? focusNode;
   final String? hintText;
+  final Widget? prefixWidget;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final TextCapitalization textCapitalization;
   final List<TextInputFormatter>? inputFormatters;
+  final Widget? suffixIcon;
   final FormFieldValidator<String>? validator;
+  final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onFieldSubmitted;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
+      focusNode: focusNode,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       textCapitalization: textCapitalization,
       inputFormatters: inputFormatters,
+      onChanged: onChanged,
       style: const TextStyle(
         color: Color(0xFF0F172A),
         fontWeight: FontWeight.w800,
@@ -2540,9 +2643,14 @@ class _InputField extends StatelessWidget {
         ),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.90),
-        prefixIcon: Icon(icon, color: const Color(0xFF0F172A), size: 21),
+        prefixIcon: prefixWidget ??
+            Icon(icon, color: const Color(0xFF0F172A), size: 21),
+        prefixIconConstraints: prefixWidget != null
+            ? const BoxConstraints(minWidth: 0, minHeight: 0)
+            : null,
+        suffixIcon: suffixIcon,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(
@@ -2681,4 +2789,489 @@ String _formatCompactNumber(double value) {
   return value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(1);
+}
+
+class _CountryDial {
+  const _CountryDial({
+    required this.name,
+    required this.isoCode,
+    required this.dialCode,
+    required this.flag,
+    required this.hint,
+  });
+
+  final String name;
+  final String isoCode;
+  final String dialCode;
+  final String flag;
+  final String hint;
+}
+
+const _kCountryDials = <_CountryDial>[
+  _CountryDial(
+    name: 'Maroc',
+    isoCode: 'MA',
+    dialCode: '+212',
+    flag: '🇲🇦',
+    hint: '06 12 34 56 78',
+  ),
+  _CountryDial(
+    name: 'France',
+    isoCode: 'FR',
+    dialCode: '+33',
+    flag: '🇫🇷',
+    hint: '06 12 34 56 78',
+  ),
+  _CountryDial(
+    name: 'Espagne',
+    isoCode: 'ES',
+    dialCode: '+34',
+    flag: '🇪🇸',
+    hint: '612 34 56 78',
+  ),
+  _CountryDial(
+    name: 'Belgique',
+    isoCode: 'BE',
+    dialCode: '+32',
+    flag: '🇧🇪',
+    hint: '0470 12 34 56',
+  ),
+  _CountryDial(
+    name: 'Pays-Bas',
+    isoCode: 'NL',
+    dialCode: '+31',
+    flag: '🇳🇱',
+    hint: '06 12 34 56 78',
+  ),
+  _CountryDial(
+    name: 'Italie',
+    isoCode: 'IT',
+    dialCode: '+39',
+    flag: '🇮🇹',
+    hint: '312 345 6789',
+  ),
+  _CountryDial(
+    name: 'Allemagne',
+    isoCode: 'DE',
+    dialCode: '+49',
+    flag: '🇩🇪',
+    hint: '151 2345 6789',
+  ),
+  _CountryDial(
+    name: 'Royaume-Uni',
+    isoCode: 'GB',
+    dialCode: '+44',
+    flag: '🇬🇧',
+    hint: '7911 123456',
+  ),
+  _CountryDial(
+    name: 'Canada',
+    isoCode: 'CA',
+    dialCode: '+1',
+    flag: '🇨🇦',
+    hint: '514 123 4567',
+  ),
+  _CountryDial(
+    name: 'États-Unis',
+    isoCode: 'US',
+    dialCode: '+1',
+    flag: '🇺🇸',
+    hint: '202 555 0123',
+  ),
+  _CountryDial(
+    name: 'Émirats Arabes Unis',
+    isoCode: 'AE',
+    dialCode: '+971',
+    flag: '🇦🇪',
+    hint: '50 123 4567',
+  ),
+  _CountryDial(
+    name: 'Arabie Saoudite',
+    isoCode: 'SA',
+    dialCode: '+966',
+    flag: '🇸🇦',
+    hint: '50 123 4567',
+  ),
+  _CountryDial(
+    name: 'Qatar',
+    isoCode: 'QA',
+    dialCode: '+974',
+    flag: '🇶🇦',
+    hint: '3312 3456',
+  ),
+  _CountryDial(
+    name: 'Koweït',
+    isoCode: 'KW',
+    dialCode: '+965',
+    flag: '🇰🇼',
+    hint: '9123 4567',
+  ),
+  _CountryDial(
+    name: 'Suisse',
+    isoCode: 'CH',
+    dialCode: '+41',
+    flag: '🇨🇭',
+    hint: '078 123 45 67',
+  ),
+  _CountryDial(
+    name: 'Tunisie',
+    isoCode: 'TN',
+    dialCode: '+216',
+    flag: '🇹🇳',
+    hint: '20 123 456',
+  ),
+  _CountryDial(
+    name: 'Algérie',
+    isoCode: 'DZ',
+    dialCode: '+213',
+    flag: '🇩🇿',
+    hint: '06 12 34 56 78',
+  ),
+  _CountryDial(
+    name: 'Sénégal',
+    isoCode: 'SN',
+    dialCode: '+221',
+    flag: '🇸🇳',
+    hint: '77 123 45 67',
+  ),
+  _CountryDial(
+    name: 'Côte d’Ivoire',
+    isoCode: 'CI',
+    dialCode: '+225',
+    flag: '🇨🇮',
+    hint: '07 12 34 56 78',
+  ),
+  _CountryDial(
+    name: 'Mauritanie',
+    isoCode: 'MR',
+    dialCode: '+222',
+    flag: '🇲🇷',
+    hint: '45 12 34 56',
+  ),
+  _CountryDial(
+    name: 'Turquie',
+    isoCode: 'TR',
+    dialCode: '+90',
+    flag: '🇹🇷',
+    hint: '512 345 6789',
+  ),
+  _CountryDial(
+    name: 'Portugal',
+    isoCode: 'PT',
+    dialCode: '+351',
+    flag: '🇵🇹',
+    hint: '912 345 678',
+  ),
+];
+
+class _CountryPickerButton extends StatelessWidget {
+  const _CountryPickerButton({
+    required this.country,
+    required this.onTap,
+  });
+
+  final _CountryDial country;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 14, right: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              country.flag,
+              style: const TextStyle(fontSize: 19),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              country.dialCode,
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(width: 3),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFF64748B),
+              size: 17,
+            ),
+            const SizedBox(width: 8),
+            Container(
+              width: 1.2,
+              height: 22,
+              color: const Color(0xFFCBD5E1),
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CountryPickerSheet extends StatefulWidget {
+  const _CountryPickerSheet({
+    required this.selectedCountry,
+  });
+
+  final _CountryDial selectedCountry;
+
+  @override
+  State<_CountryPickerSheet> createState() => _CountryPickerSheetState();
+}
+
+class _CountryPickerSheetState extends State<_CountryPickerSheet> {
+  final _searchController = TextEditingController();
+  String _search = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<_CountryDial> get _filteredList {
+    if (_search.trim().isEmpty) {
+      return _kCountryDials;
+    }
+    final q = _search.trim().toLowerCase();
+    return _kCountryDials.where((c) {
+      return c.name.toLowerCase().contains(q) ||
+          c.dialCode.toLowerCase().contains(q) ||
+          c.isoCode.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.72,
+      ),
+      margin: EdgeInsets.only(bottom: bottomInset),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 25,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 38,
+                height: 4.5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        color: Color(0xFF059669),
+                        size: 19,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Indicatif WhatsApp',
+                            style: TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            'Sélectionnez le pays pour recevoir votre devis',
+                            style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded,
+                          color: Color(0xFF64748B), size: 22),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (val) => setState(() => _search = val),
+                  decoration: InputDecoration(
+                    hintText:
+                        'Rechercher un pays ou indicatif (+33, France...)',
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 13.5,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    suffixIcon: _search.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _search = '');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 11),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF10B981), width: 1.6),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: _filteredList.length,
+                  separatorBuilder: (_, __) => const Divider(
+                    height: 1,
+                    indent: 64,
+                    color: Color(0xFFF1F5F9),
+                  ),
+                  itemBuilder: (context, index) {
+                    final item = _filteredList[index];
+                    final isSelected =
+                        item.dialCode == widget.selectedCountry.dialCode &&
+                            item.isoCode == widget.selectedCountry.isoCode;
+                    return ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 2),
+                      leading: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            item.flag,
+                            style: const TextStyle(fontSize: 24),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              item.isoCode,
+                              style: const TextStyle(
+                                color: Color(0xFF475569),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      title: Text(
+                        item.name,
+                        style: TextStyle(
+                          color: isSelected
+                              ? const Color(0xFF047857)
+                              : const Color(0xFF0F172A),
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            item.dialCode,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? const Color(0xFF047857)
+                                  : const Color(0xFF64748B),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                          if (isSelected) ...[
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: Color(0xFF059669),
+                              size: 18,
+                            ),
+                          ],
+                        ],
+                      ),
+                      onTap: () => Navigator.of(context).pop(item),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

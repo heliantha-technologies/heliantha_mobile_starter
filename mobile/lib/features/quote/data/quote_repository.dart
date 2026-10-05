@@ -18,12 +18,14 @@ class QuoteRepository {
         response = await _api.dio.post<Map<String, dynamic>>(
           '/v1/devis/calculer',
           data: payload.toJson(),
+          options: _extendedTimeoutOptions(),
         );
       } on DioException catch (e) {
         if (e.response?.statusCode == 404) {
           response = await _api.dio.post<Map<String, dynamic>>(
             '/api/calculate',
             data: payload.toJson(),
+            options: _extendedTimeoutOptions(),
           );
         } else {
           rethrow;
@@ -46,7 +48,7 @@ class QuoteRepository {
       try {
         response = await _api.dio.get<Object>(
           '/v1/devis/$safeIdentifier/pdf',
-          options: Options(
+          options: _extendedTimeoutOptions(
             responseType: ResponseType.bytes,
             headers: {'Accept': 'application/pdf'},
           ),
@@ -55,7 +57,7 @@ class QuoteRepository {
         if (e.response?.statusCode == 404) {
           response = await _api.dio.get<Object>(
             '/api/devis/pdf/$safeIdentifier',
-            options: Options(
+            options: _extendedTimeoutOptions(
               responseType: ResponseType.bytes,
               headers: {'Accept': 'application/pdf'},
             ),
@@ -110,6 +112,19 @@ class QuoteRepository {
       return Uint8List.fromList(data);
     }
     return Uint8List(0);
+  }
+
+  static Options _extendedTimeoutOptions({
+    ResponseType? responseType,
+    Map<String, dynamic>? headers,
+  }) {
+    return Options(
+      responseType: responseType,
+      headers: headers,
+      connectTimeout: const Duration(seconds: 45),
+      receiveTimeout: const Duration(seconds: 60),
+      sendTimeout: const Duration(seconds: 45),
+    );
   }
 
   static String _readDioError(DioException error) {

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../shared/widgets/brand_widgets.dart';
 import '../../data/assistant_api_service.dart';
 
 /// Modèle de données pour les devis calculés par AssistantDevisManager
@@ -225,7 +226,10 @@ class AiChatBottomSheet extends ConsumerStatefulWidget {
               child: SizedBox(
                 width: 420,
                 height: panelHeight,
-                child: chat,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: chat,
+                ),
               ),
             ),
           );
@@ -511,18 +515,24 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
   void _streamResponse(_ChatMessage message, String fullText) {
     _streamingTimer?.cancel();
     int charIndex = 0;
+    int tickCount = 0;
     final total = fullText.length;
-    final step = (total / 50).clamp(2, 6).toInt();
+    final step = total == 0 ? 1 : (total / 60).clamp(2, 3).round();
 
     setState(() {
       message.isStreaming = true;
     });
 
-    _streamingTimer = Timer.periodic(const Duration(milliseconds: 28), (timer) {
+    _streamingTimer = Timer.periodic(const Duration(milliseconds: 45), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
+      final shouldFollow = _scrollController.hasClients &&
+          _scrollController.position.maxScrollExtent -
+                  _scrollController.offset <
+              48;
+      tickCount++;
       charIndex = (charIndex + step).clamp(0, total);
       setState(() {
         message.displayedText = fullText.substring(0, charIndex);
@@ -533,11 +543,11 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
           timer.cancel();
         }
       });
-      if (_scrollController.hasClients) {
-        final max = _scrollController.position.maxScrollExtent;
-        if (_scrollController.offset < max) {
-          _scrollController.jumpTo(max);
-        }
+      if (shouldFollow && tickCount % 4 == 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_scrollController.hasClients) return;
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        });
       }
     });
   }
@@ -634,32 +644,11 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
           child: Row(
             children: [
-              // Avatar miniature HeliAntha avec contour or
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                  ),
-                  borderRadius: BorderRadius.circular(13),
-                  border: Border.all(
-                    color: const Color(0xFFF59E0B),
-                    width: 1.4,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: Color(0xFFF59E0B),
-                  size: 20,
-                ),
+              // Logo officiel Heliantha dans l'en-tête de l'assistant
+              const HelianthaLogo(
+                size: 38,
+                padding: 3,
+                showShadow: false,
               ),
               const SizedBox(width: 12),
               Expanded(

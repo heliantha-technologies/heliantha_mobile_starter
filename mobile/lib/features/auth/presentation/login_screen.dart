@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -57,10 +59,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             password: password,
           );
       ref.invalidate(currentUserProvider);
-      await ref.read(fcmServiceProvider).registerForCurrentUser();
       if (mounted) {
         context.replace(_safeRedirect(widget.redirectLocation));
       }
+      unawaited(
+        ref
+            .read(fcmServiceProvider)
+            .registerForCurrentUser()
+            .catchError((error) {
+          debugPrint('FCM error: $error');
+        }),
+      );
     } catch (_) {
       if (mounted) {
         setState(() => _error = friendlyLoginMessage());

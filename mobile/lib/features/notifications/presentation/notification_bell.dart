@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/brand_widgets.dart';
 import '../providers/notifications_provider.dart';
 
 class NotificationBell extends ConsumerWidget {
@@ -19,15 +19,16 @@ class NotificationBell extends ConsumerWidget {
       ),
     );
 
-    return IconButton(
+    return TopBarActionPastille(
       tooltip: 'Notifications',
-      onPressed: () => context.push('/notifications'),
-      icon: Badge(
-        isLabelVisible: unread > 0,
-        backgroundColor: AppColors.danger,
-        label: Text(unread > 9 ? '9+' : '$unread'),
-        child: const Icon(Icons.notifications_none_rounded),
-      ),
+      icon: Icons.notifications_rounded,
+      iconColor: const Color(0xFFEA580C),
+      backgroundColor: const Color(0xFFFFEDD5),
+      gradientColors: const [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+      borderColor: const Color(0xFFEA580C).withValues(alpha: 0.32),
+      shadowColor: const Color(0xFFEA580C),
+      badgeCount: unread,
+      onTap: () => context.push('/notifications'),
     );
   }
 }

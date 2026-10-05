@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,37 +55,37 @@ class NotificationsScreen extends ConsumerWidget {
             );
           }
 
-          return ResponsivePagePadding(
-            bottom: 96,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _NotificationsHeader(
-                  unread: result.unread,
-                  total: result.items.length,
-                ),
-                const SizedBox(height: 14),
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: result.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final item = result.items[index];
-                    return _NotificationTile(
+          return SingleChildScrollView(
+            child: ResponsivePagePadding(
+              bottom: 96,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _NotificationsHeader(
+                    unread: result.unread,
+                    total: result.items.length,
+                  ),
+                  const SizedBox(height: 14),
+                  for (final item in result.items) ...[
+                    _NotificationTile(
                       item: item,
-                      onTap: () async {
-                        await ref
-                            .read(notificationsRepositoryProvider)
-                            .markRead(item.id);
+                      onTap: () {
+                        unawaited(
+                          ref
+                              .read(notificationsRepositoryProvider)
+                              .markRead(item.id)
+                              .catchError((error) {
+                            debugPrint('Notification mark-read error: $error');
+                          }),
+                        );
                         ref.invalidate(notificationsProvider);
-                        if (!context.mounted) return;
                         _openNotification(context, item);
                       },
-                    );
-                  },
-                ),
-              ],
+                    ),
+                    if (item != result.items.last) const SizedBox(height: 12),
+                  ],
+                ],
+              ),
             ),
           );
         },
@@ -441,17 +443,19 @@ class _NotificationsSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ResponsivePagePadding(
-      bottom: 96,
-      child: Column(
-        children: [
-          const _SkeletonCard(height: 82),
-          const SizedBox(height: 14),
-          for (var i = 0; i < 5; i++) ...[
-            const _NotificationSkeletonTile(),
-            if (i != 4) const SizedBox(height: 12),
+    return SingleChildScrollView(
+      child: ResponsivePagePadding(
+        bottom: 96,
+        child: Column(
+          children: [
+            const _SkeletonCard(height: 82),
+            const SizedBox(height: 14),
+            for (var i = 0; i < 5; i++) ...[
+              const _NotificationSkeletonTile(),
+              if (i != 4) const SizedBox(height: 12),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -61,10 +63,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             password: _password.text,
           );
       ref.invalidate(currentUserProvider);
-      await ref.read(fcmServiceProvider).registerForCurrentUser();
       if (mounted) {
         context.replace(_safeRedirect(widget.redirectLocation));
       }
+      unawaited(
+        ref
+            .read(fcmServiceProvider)
+            .registerForCurrentUser()
+            .catchError((error) {
+          debugPrint('FCM error: $error');
+        }),
+      );
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -307,7 +316,8 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.person_add_alt_1_rounded),
-                  label: Text(widget.loading ? 'Création...' : 'Créer un compte'),
+                  label:
+                      Text(widget.loading ? 'Création...' : 'Créer un compte'),
                 ),
               ),
             ],
