@@ -6,6 +6,7 @@ import '../../core/router/navigation_helpers.dart';
 import '../../features/cart/providers/cart_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_tokens.dart';
+import '../theme/app_vector_icons.dart';
 
 const helianthaLogoAsset = 'assets/brand/helin.jpeg';
 
@@ -42,9 +43,12 @@ class HelianthaLogo extends StatelessWidget {
         child: Image.asset(
           helianthaLogoAsset,
           fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const Icon(
-            Icons.solar_power_rounded,
-            color: AppColors.blue,
+          errorBuilder: (_, __, ___) => const Center(
+            child: AppSvgIcon(
+              AppVectorIcons.logoSun,
+              color: AppColors.blue,
+              size: 24,
+            ),
           ),
         ),
       ),

@@ -23,6 +23,7 @@ import '../../shared/models/order.dart';
 import '../../features/product/presentation/product_screen.dart';
 import '../../shared/models/product.dart';
 import '../../shared/theme/app_colors.dart';
+import '../../shared/theme/app_vector_icons.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
@@ -246,13 +247,29 @@ class _Shell extends StatelessWidget {
                     },
                     destinations: [
                       const NavigationDestination(
-                        icon: Icon(Icons.home_outlined),
-                        selectedIcon: Icon(Icons.home_rounded),
+                        icon: AppSvgIcon(
+                          AppVectorIcons.navHome,
+                          size: 23,
+                          color: AppColors.muted,
+                        ),
+                        selectedIcon: AppSvgIcon(
+                          AppVectorIcons.navHomeFilled,
+                          size: 23,
+                          color: AppColors.navy,
+                        ),
                         label: 'Accueil',
                       ),
                       const NavigationDestination(
-                        icon: Icon(Icons.manage_search_rounded),
-                        selectedIcon: Icon(Icons.search_rounded),
+                        icon: AppSvgIcon(
+                          AppVectorIcons.navCatalog,
+                          size: 23,
+                          color: AppColors.muted,
+                        ),
+                        selectedIcon: AppSvgIcon(
+                          AppVectorIcons.navCatalogFilled,
+                          size: 23,
+                          color: AppColors.navy,
+                        ),
                         label: 'Catalogue',
                       ),
                       const NavigationDestination(
@@ -261,13 +278,29 @@ class _Shell extends StatelessWidget {
                         label: 'Devis',
                       ),
                       const NavigationDestination(
-                        icon: Icon(Icons.favorite_border_rounded),
-                        selectedIcon: Icon(Icons.favorite_rounded),
+                        icon: AppSvgIcon(
+                          AppVectorIcons.navFavorites,
+                          size: 23,
+                          color: AppColors.muted,
+                        ),
+                        selectedIcon: AppSvgIcon(
+                          AppVectorIcons.navFavoritesFilled,
+                          size: 23,
+                          color: AppColors.navy,
+                        ),
                         label: 'Favoris',
                       ),
                       const NavigationDestination(
-                        icon: Icon(Icons.person_outline_rounded),
-                        selectedIcon: Icon(Icons.person_rounded),
+                        icon: AppSvgIcon(
+                          AppVectorIcons.navAccount,
+                          size: 23,
+                          color: AppColors.muted,
+                        ),
+                        selectedIcon: AppSvgIcon(
+                          AppVectorIcons.navAccountFilled,
+                          size: 23,
+                          color: AppColors.navy,
+                        ),
                         label: 'Compte',
                       ),
                     ],

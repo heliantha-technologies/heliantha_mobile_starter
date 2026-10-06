@@ -15,6 +15,7 @@ import '../../../shared/models/category.dart';
 import '../../../shared/models/home_slide.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_tokens.dart';
+import '../../../shared/theme/app_vector_icons.dart';
 import '../../../shared/utils/api_url.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_ui.dart';
@@ -749,10 +750,12 @@ class _ProductSlide extends StatelessWidget {
                           color: AppColors.sun,
                           borderRadius: BorderRadius.circular(AppRadii.sm),
                         ),
-                        child: const Icon(
-                          Icons.arrow_forward_rounded,
-                          color: AppColors.navy,
-                          size: 16,
+                        child: const Center(
+                          child: AppSvgIcon(
+                            AppVectorIcons.arrowForward,
+                            color: AppColors.navy,
+                            size: 14,
+                          ),
                         ),
                       ),
                     ],
@@ -1054,10 +1057,12 @@ class _QuotePromoCtaCardState extends State<_QuotePromoCtaCard>
                                           .withValues(alpha: 0.35),
                                     ),
                                   ),
-                                  child: const Icon(
-                                    Icons.auto_awesome_rounded,
-                                    color: Color(0xFFE5A93C),
-                                    size: 22,
+                                  child: const Center(
+                                    child: AppSvgIcon(
+                                      AppVectorIcons.sparkle,
+                                      color: Color(0xFFE5A93C),
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -1117,10 +1122,12 @@ class _QuotePromoCtaCardState extends State<_QuotePromoCtaCard>
                                     ),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(
-                                    Icons.arrow_forward_rounded,
-                                    color: Color(0xFF0A192F),
-                                    size: 18,
+                                  child: const Center(
+                                    child: AppSvgIcon(
+                                      AppVectorIcons.arrowForward,
+                                      color: Color(0xFF0A192F),
+                                      size: 16,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1144,6 +1151,7 @@ class _SolarUniverse {
   const _SolarUniverse({
     required this.displayName,
     required this.icon,
+    this.svgString,
     required this.gradient,
     required this.iconColor,
     required this.categoryNames,
@@ -1152,6 +1160,7 @@ class _SolarUniverse {
 
   final String displayName;
   final IconData icon;
+  final String? svgString;
   final List<Color> gradient;
   final Color iconColor;
   final List<String> categoryNames;
@@ -1195,6 +1204,7 @@ const _solarUniverses = [
   _SolarUniverse(
     displayName: 'Panneaux Solaires',
     icon: Icons.solar_power_outlined,
+    svgString: AppVectorIcons.solarPanel,
     gradient: [Color(0xFFFEF3C7), Color(0xFFFCD34D)],
     iconColor: Color(0xFFB45309),
     categoryNames: [
@@ -1208,6 +1218,7 @@ const _solarUniverses = [
   _SolarUniverse(
     displayName: 'Onduleurs & Hybrides',
     icon: Icons.electric_bolt_outlined,
+    svgString: AppVectorIcons.inverter,
     gradient: [Color(0xFFE0E7FF), Color(0xFFC7D2FE)],
     iconColor: Color(0xFF3730A3),
     categoryNames: [
@@ -1221,6 +1232,7 @@ const _solarUniverses = [
   _SolarUniverse(
     displayName: 'Batteries & Stockage',
     icon: Icons.battery_charging_full_outlined,
+    svgString: AppVectorIcons.battery,
     gradient: [Color(0xFFD1FAE5), Color(0xFFA7F3D0)],
     iconColor: Color(0xFF065F46),
     categoryNames: [
@@ -1234,6 +1246,7 @@ const _solarUniverses = [
   _SolarUniverse(
     displayName: 'Pompage & Variateurs',
     icon: Icons.water_drop_outlined,
+    svgString: AppVectorIcons.pump,
     gradient: [Color(0xFFE0F2FE), Color(0xFFBAE6FD)],
     iconColor: Color(0xFF0284C7),
     categoryNames: [
@@ -1247,6 +1260,7 @@ const _solarUniverses = [
   _SolarUniverse(
     displayName: 'Coffrets & Câblage',
     icon: Icons.shield_outlined,
+    svgString: AppVectorIcons.shieldBreaker,
     gradient: [Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
     iconColor: Color(0xFF334155),
     categoryNames: [
@@ -1261,6 +1275,7 @@ const _solarUniverses = [
   _SolarUniverse(
     displayName: 'Éclairage Solaire',
     icon: Icons.wb_incandescent_outlined,
+    svgString: AppVectorIcons.solarLighting,
     gradient: [Color(0xFFFEF9C3), Color(0xFFFEF08A)],
     iconColor: Color(0xFFA16207),
     categoryNames: [
@@ -1445,11 +1460,17 @@ class _CategoryGlassCardState extends State<_CategoryGlassCard> {
                             ],
                           ),
                           child: Center(
-                            child: Icon(
-                              meta.icon,
-                              size: 22,
-                              color: meta.iconColor,
-                            ),
+                            child: meta.svgString != null
+                                ? AppSvgIcon(
+                                    meta.svgString!,
+                                    size: 22,
+                                    color: meta.iconColor,
+                                  )
+                                : Icon(
+                                    meta.icon,
+                                    size: 22,
+                                    color: meta.iconColor,
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 8),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_tokens.dart';
+import '../theme/app_vector_icons.dart';
 
 class AppSectionHeader extends StatelessWidget {
   const AppSectionHeader({
@@ -141,9 +142,9 @@ class _SectionActionButtonState extends State<_SectionActionButton> {
                     ),
                   ),
                   const SizedBox(width: 5),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 16,
+                  AppSvgIcon(
+                    AppVectorIcons.arrowForward,
+                    size: 14,
                     color: AppColors.navy.withValues(alpha: 0.92),
                   ),
                 ],
