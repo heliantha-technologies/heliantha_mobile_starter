@@ -1566,80 +1566,75 @@ class _SupportPanelState extends State<_SupportPanel> {
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedScale(
+      child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        scale: _hovered ? 1.005 : 1,
-        child: Container(
-          key: const ValueKey('home-support-panel'),
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.navy.withValues(
-                  alpha: _hovered ? 0.10 : 0.06,
-                ),
-                blurRadius: _hovered ? 26 : 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
+        key: const ValueKey('home-support-panel'),
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _hovered
+                ? const Color(0xFF25D366).withValues(alpha: 0.45)
+                : const Color(0xFFE2E8F0),
+            width: 1.0,
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Material(
-              color: Colors.white,
-              child: Ink(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Color(0xFFF3FAF7)],
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: _hovered
-                        ? AppColors.leaf.withValues(alpha: 0.45)
-                        : const Color(0xFFD6E8DF),
-                  ),
-                ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(24),
-                  onTap: _openWhatsApp,
-                  splashColor: AppColors.leaf.withValues(alpha: 0.08),
-                  highlightColor: AppColors.leaf.withValues(alpha: 0.03),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final compact = constraints.maxWidth < 680 ||
-                            MediaQuery.textScalerOf(context).scale(14) > 18;
-                        final button = _WhatsAppCtaButton(
-                          hovered: _hovered,
-                        );
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(
+                alpha: _hovered ? 0.07 : 0.035,
+              ),
+              blurRadius: _hovered ? 14 : 8,
+              offset: const Offset(0, 2),
+            ),
+            if (_hovered)
+              BoxShadow(
+                color: const Color(0xFF25D366).withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _openWhatsApp,
+              splashColor: const Color(0xFF25D366).withValues(alpha: 0.08),
+              highlightColor: const Color(0xFF25D366).withValues(alpha: 0.03),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 540 &&
+                        MediaQuery.textScalerOf(context).scale(14) <= 16;
+                    final button = _WhatsAppCtaButton(
+                      hovered: _hovered,
+                    );
 
-                        if (compact) {
-                          return Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const _SupportPanelText(),
-                              const SizedBox(height: 18),
-                              button,
-                            ],
-                          );
-                        }
+                    if (isWide) {
+                      return Row(
+                        children: [
+                          const Expanded(child: _SupportPanelText()),
+                          const SizedBox(width: 16),
+                          SizedBox(width: 210, child: button),
+                        ],
+                      );
+                    }
 
-                        return Row(
-                          children: [
-                            const Expanded(child: _SupportPanelText()),
-                            const SizedBox(width: 24),
-                            SizedBox(width: 260, child: button),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const _SupportPanelText(),
+                        const SizedBox(height: 9),
+                        button,
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -1656,21 +1651,71 @@ class _SupportIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 52,
-      height: 52,
+      width: 34,
+      height: 34,
       decoration: BoxDecoration(
+        shape: BoxShape.circle,
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.softSun, Color(0xFFFFE8A4)],
+          colors: [Color(0xFF25D366), Color(0xFF16A34A)],
         ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.sun.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF25D366).withValues(alpha: 0.30),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: const Icon(
-        Icons.support_agent_rounded,
-        color: AppColors.navy,
-        size: 28,
+      child: const Center(
+        child: Icon(
+          Icons.chat_bubble_rounded,
+          color: Colors.white,
+          size: 17,
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveBadge extends StatelessWidget {
+  const _LiveBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: const Color(0xFF86EFAC).withValues(alpha: 0.8),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              color: Color(0xFF10B981),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Text(
+            'En direct',
+            style: TextStyle(
+              color: Color(0xFF047857),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1681,52 +1726,49 @@ class _SupportPanelText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SupportIcon(),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        const _SupportIcon(),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
                 children: [
-                  const Text(
-                    'À VOTRE ÉCOUTE',
-                    style: TextStyle(
-                      color: AppColors.leaf,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.1,
+                  Flexible(
+                    child: Text(
+                      'Besoin de conseils ?',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: const Color(0xFF0F172A),
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            height: 1.2,
+                          ),
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Besoin de conseils ?',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.navy,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          height: 1.2,
-                          letterSpacing: -0.4,
-                        ),
-                  ),
+                  const SizedBox(width: 6),
+                  const _LiveBadge(),
                 ],
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Notre équipe vous aide à choisir la solution solaire adaptée à votre projet.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.muted,
-                fontSize: 13,
-                height: 1.5,
+              const SizedBox(height: 3),
+              Text(
+                'Nos experts solaires vous guident dans votre projet.',
+                maxLines: 2,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF64748B),
+                      fontSize: 11.5,
+                      height: 1.3,
+                      fontWeight: FontWeight.w400,
+                    ),
               ),
+            ],
+          ),
         ),
       ],
     );
@@ -1745,50 +1787,55 @@ class _WhatsAppCtaButton extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 52),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      height: 33,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: hovered
-              ? const [Color(0xFF12764A), Color(0xFF0D5638)]
-              : const [Color(0xFF168A55), Color(0xFF126941)],
+              ? const [Color(0xFF2EE673), Color(0xFF1EA755)]
+              : const [Color(0xFF25D366), Color(0xFF16A34A)],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(999),
         boxShadow: [
           BoxShadow(
-            color: AppColors.leaf.withValues(alpha: hovered ? 0.24 : 0.16),
-            blurRadius: hovered ? 16 : 10,
-            offset: const Offset(0, 5),
+            color: const Color(0xFF25D366).withValues(alpha: hovered ? 0.30 : 0.16),
+            blurRadius: hovered ? 10 : 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
+      child: const Row(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.chat_bubble_rounded,
-            size: 20,
+            size: 13.5,
             color: Colors.white,
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 7),
           Flexible(
             child: Text(
               'Échanger sur WhatsApp',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    height: 1.2,
-                  ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.1,
+              ),
             ),
           ),
-          const SizedBox(width: 8),
-          const Icon(Icons.arrow_forward_rounded,
-              size: 18, color: Colors.white),
+          SizedBox(width: 5),
+          Icon(
+            Icons.arrow_forward_rounded,
+            size: 12.5,
+            color: Colors.white,
+          ),
         ],
       ),
     );

@@ -378,8 +378,10 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
         lower.contains('eau')) {
       return [
         'Analyse de vos paramètres de pompage...',
-        'Calcul du débit et de la hauteur d\'élévation...',
+        'Calcul du débit et du gisement solaire...',
         'Sélection des équipements solaires adaptés...',
+        'Réflexion... presque prêt !',
+        'Récapitulatif de votre solution...',
       ];
     } else if (lower.contains('batteri') ||
         lower.contains('lithium') ||
@@ -390,6 +392,8 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
         'Étude de votre autonomie électrique...',
         'Dimensionnement du stockage batteries...',
         'Optimisation de la solution hybride...',
+        'Réflexion... presque prêt !',
+        'Récapitulatif de votre installation...',
       ];
     } else if (lower.contains('factur') ||
         lower.contains('onee') ||
@@ -401,14 +405,18 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
         lower.contains('tarif')) {
       return [
         'Analyse de votre consommation électrique...',
-        'Calcul des économies photovoltaïques...',
+        'Calcul de vos économies solaires...',
         'Dimensionnement optimal des modules...',
+        'Réflexion... presque prêt !',
+        'Récapitulatif et devis adapté...',
       ];
     }
 
     return [
-      'Recherche de la solution HeliAntha adaptée...',
-      'Personnalisation de vos conseils...',
+      'Analyse de votre demande...',
+      'Recherche de la solution HeliAntha...',
+      'Réflexion... presque prêt !',
+      'Récapitulatif de vos conseils personnalisés...',
     ];
   }
 
@@ -451,7 +459,7 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
 
     _thinkingTimer?.cancel();
     _thinkingTimer =
-        Timer.periodic(const Duration(milliseconds: 2500), (timer) {
+        Timer.periodic(const Duration(milliseconds: 1700), (timer) {
       if (!mounted || !assistantMessage.isThinking) {
         timer.cancel();
         return;
@@ -816,52 +824,17 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
               ),
             ),
             const SizedBox(width: 10),
-            // Bouton rond iOS d'envoi Bleu Nuit avec flèche dorée
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _isLoading
-                    ? null
-                    : () => _submitUserMessage(_textController.text),
-                borderRadius: BorderRadius.circular(999),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF0F172A).withValues(alpha: 0.25),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFFF59E0B),
-                              ),
-                            ),
-                          )
-                        : const Icon(
-                            Icons.arrow_upward_rounded,
-                            color: Color(0xFFF59E0B),
-                            size: 22,
-                          ),
-                  ),
-                ),
-              ),
+            // Bouton rond iOS d'envoi Bleu Nuit avec Soleil orbital qui tourne
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _textController,
+              builder: (context, value, _) {
+                final hasText = value.text.trim().isNotEmpty;
+                return _AiChatSendButton(
+                  isLoading: _isLoading,
+                  hasText: hasText,
+                  onPressed: () => _submitUserMessage(_textController.text),
+                );
+              },
             ),
           ],
         ),
@@ -936,19 +909,13 @@ class _ChatMessageTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            margin: const EdgeInsets.only(right: 8, top: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEF3C7),
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: const Color(0xFFFDE68A), width: 1),
-            ),
-            child: const Icon(
-              Icons.auto_awesome_rounded,
-              color: Color(0xFFD97706),
-              size: 16,
+          // Avatar officiel HeliAntha (logo de marque)
+          const Padding(
+            padding: EdgeInsets.only(right: 8, top: 2),
+            child: HelianthaLogo(
+              size: 30,
+              padding: 2,
+              showShadow: false,
             ),
           ),
           Flexible(
@@ -1024,7 +991,7 @@ class _ChatMessageTile extends StatelessWidget {
   }
 }
 
-/// Indicateur de réflexion élégant, apaisé et stable (style Apple Intelligence / iMessage)
+/// Indicateur de réflexion élégant, moderne et rassurant avec le mini-soleil orbital HeliAntha
 class _ThinkingIndicator extends StatefulWidget {
   const _ThinkingIndicator({this.step = ''});
 
@@ -1043,7 +1010,7 @@ class _ThinkingIndicatorState extends State<_ThinkingIndicator>
     super.initState();
     _anim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 2200),
     )..repeat();
   }
 
@@ -1056,13 +1023,13 @@ class _ThinkingIndicatorState extends State<_ThinkingIndicator>
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 42,
+      height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.38),
           width: 1.0,
         ),
         boxShadow: [
@@ -1072,30 +1039,37 @@ class _ThinkingIndicatorState extends State<_ThinkingIndicator>
             offset: const Offset(0, 3),
           ),
           BoxShadow(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 1),
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.10),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 3 points ondulants élégants (Apple / iOS typing wave)
-          _TypingDots(controller: _anim),
+          _MiniOrbitalSun(controller: _anim),
           const SizedBox(width: 10),
           Flexible(
-            child: Text(
-              widget.step.isNotEmpty
-                  ? widget.step
-                  : 'HeliAntha prépare votre réponse...',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF475569),
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.1,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 320),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, anim) =>
+                  FadeTransition(opacity: anim, child: child),
+              child: Text(
+                widget.step.isNotEmpty
+                    ? widget.step
+                    : 'HeliAntha prépare votre réponse...',
+                key: ValueKey(widget.step),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF1E293B),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.1,
+                ),
               ),
             ),
           ),
@@ -1105,50 +1079,265 @@ class _ThinkingIndicatorState extends State<_ThinkingIndicator>
   }
 }
 
-/// 3 points lumineux à pulsation douce déphasée (style iOS / iMessage)
-class _TypingDots extends StatelessWidget {
-  const _TypingDots({required this.controller});
+/// Mini-soleil orbital HeliAntha avec rayons en rotation et satellite d'énergie en orbite
+class _MiniOrbitalSun extends StatelessWidget {
+  const _MiniOrbitalSun({
+    super.key,
+    required this.controller,
+    this.size = 26,
+  });
 
   final AnimationController controller;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: controller,
-      builder: (context, child) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (index) {
-            final delay = index * 0.22;
-            final t = (controller.value - delay) % 1.0;
-            final wave = math.sin(t * math.pi * 2);
-            final translationY = wave * 2.2;
-            final opacity = 0.35 + (0.65 * ((wave + 1) / 2));
-
-            return Padding(
-              padding: EdgeInsets.only(right: index < 2 ? 4.0 : 0.0),
-              child: Transform.translate(
-                offset: Offset(0, -translationY),
-                child: Container(
-                  width: 6.5,
-                  height: 6.5,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: index == 1
-                        ? const Color(0xFFF59E0B).withValues(alpha: opacity)
-                        : const Color(0xFF0F172A).withValues(alpha: opacity),
-                  ),
-                ),
-              ),
-            );
-          }),
+      builder: (context, _) {
+        final t = controller.value;
+        return CustomPaint(
+          size: Size(size, size),
+          painter: _MiniSunPainter(
+            spin: t,
+            pulse: (math.sin(t * 2 * math.pi) + 1) / 2,
+          ),
         );
       },
     );
   }
 }
 
-/// Curseur de frappe animé clignotant
+class _MiniSunPainter extends CustomPainter {
+  const _MiniSunPainter({required this.spin, required this.pulse});
+
+  final double spin;
+  final double pulse;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide / 2;
+    final coreRadius = radius * (0.34 + 0.04 * pulse);
+
+    // 1. Halo doux doré
+    canvas.drawCircle(
+      center,
+      radius * (0.75 + 0.08 * pulse),
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFDE68A).withValues(alpha: 0.55),
+            const Color(0xFFFDE68A).withValues(alpha: 0.0),
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: radius)),
+    );
+
+    // 2. Orbite pointillée bleue cyan
+    final orbitRadius = radius * 0.88;
+    final orbitPaint = Paint()
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.40)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    const dashCount = 20;
+    for (var i = 0; i < dashCount; i += 2) {
+      final a0 = (i / dashCount) * 2 * math.pi;
+      final a1 = ((i + 1) / dashCount) * 2 * math.pi;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: orbitRadius),
+        a0,
+        a1 - a0,
+        false,
+        orbitPaint,
+      );
+    }
+
+    // 3. Rayons solaires dorés en rotation douce
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(spin * 2 * math.pi);
+    const rayCount = 8;
+    for (var i = 0; i < rayCount; i++) {
+      final isLong = i.isEven;
+      final inner = coreRadius + 1.2;
+      final outer = coreRadius + (isLong ? 3.4 : 2.4);
+      final rayPaint = Paint()
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = isLong ? 1.8 : 1.3
+        ..color = (isLong ? const Color(0xFFF59E0B) : const Color(0xFFFBBF24))
+            .withValues(alpha: isLong ? 0.95 : 0.80);
+      final angle = (i / rayCount) * 2 * math.pi;
+      final dir = Offset(math.cos(angle), math.sin(angle));
+      canvas.drawLine(dir * inner, dir * outer, rayPaint);
+    }
+    canvas.restore();
+
+    // 4. Cœur du soleil dégradé chaud
+    final coreRect = Rect.fromCircle(center: center, radius: coreRadius);
+    canvas.drawCircle(
+      center,
+      coreRadius,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.35, -0.35),
+          colors: [Color(0xFFFFF7CC), Color(0xFFFCD34D), Color(0xFFF59E0B)],
+          stops: [0.0, 0.45, 1.0],
+        ).createShader(coreRect),
+    );
+
+    // 5. Petit satellite d'énergie en orbite dynamique
+    final satAngle = -spin * 2 * math.pi * 2 - math.pi / 2;
+    final satPos = center +
+        Offset(math.cos(satAngle), math.sin(satAngle)) * orbitRadius;
+    canvas.drawCircle(
+      satPos,
+      3.2,
+      Paint()
+        ..color = const Color(0xFF38BDF8).withValues(alpha: 0.40)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+    );
+    canvas.drawCircle(
+      satPos,
+      2.0,
+      Paint()..color = const Color(0xFF0EA5E9),
+    );
+    canvas.drawCircle(
+      satPos,
+      0.9,
+      Paint()..color = Colors.white,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MiniSunPainter oldDelegate) =>
+      oldDelegate.spin != spin || oldDelegate.pulse != pulse;
+}
+
+/// Bouton rond d'envoi HeliAntha arborant le Soleil orbital qui tourne pendant la réflexion et l'envoi
+class _AiChatSendButton extends StatefulWidget {
+  const _AiChatSendButton({
+    required this.isLoading,
+    required this.hasText,
+    required this.onPressed,
+  });
+
+  final bool isLoading;
+  final bool hasText;
+  final VoidCallback? onPressed;
+
+  @override
+  State<_AiChatSendButton> createState() => _AiChatSendButtonState();
+}
+
+class _AiChatSendButtonState extends State<_AiChatSendButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spinController;
+
+  @override
+  void initState() {
+    super.initState();
+    _spinController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    if (widget.isLoading) {
+      _spinController.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _AiChatSendButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isLoading != oldWidget.isLoading) {
+      if (widget.isLoading) {
+        if (!_spinController.isAnimating) {
+          _spinController.repeat();
+        }
+      } else {
+        _spinController.stop();
+        _spinController.reset();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _spinController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEnabled = !widget.isLoading && widget.onPressed != null;
+
+    return Semantics(
+      button: true,
+      label: widget.isLoading
+          ? 'Envoi et analyse en cours...'
+          : 'Envoyer le message',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isEnabled ? widget.onPressed : null,
+          borderRadius: BorderRadius.circular(999),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+              ),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: widget.isLoading
+                    ? const Color(0xFFF59E0B).withValues(alpha: 0.75)
+                    : widget.hasText
+                        ? const Color(0xFFF59E0B).withValues(alpha: 0.45)
+                        : const Color(0xFFE2E8F0).withValues(alpha: 0.20),
+                width: 1.3,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.isLoading
+                      ? const Color(0xFFF59E0B).withValues(alpha: 0.35)
+                      : const Color(0xFF0F172A).withValues(alpha: 0.22),
+                  blurRadius: widget.isLoading ? 12 : 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 240),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: widget.isLoading
+                    ? _MiniOrbitalSun(
+                        key: const ValueKey('spinning_sun_send'),
+                        controller: _spinController,
+                        size: 26,
+                      )
+                    : Icon(
+                        Icons.arrow_upward_rounded,
+                        key: const ValueKey('send_arrow'),
+                        color: widget.hasText
+                            ? const Color(0xFFF59E0B)
+                            : const Color(0xFFFDE68A).withValues(alpha: 0.85),
+                        size: 22,
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Indicateur de frappe : mini-soleil HeliAntha qui tourne pendant l'écriture
 class _BlinkingCursor extends StatefulWidget {
   const _BlinkingCursor();
 
@@ -1165,8 +1354,8 @@ class _BlinkingCursorState extends State<_BlinkingCursor>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 1800),
+    )..repeat();
   }
 
   @override
@@ -1177,17 +1366,9 @@ class _BlinkingCursorState extends State<_BlinkingCursor>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _controller,
-      child: Container(
-        width: 7,
-        height: 14,
-        margin: const EdgeInsets.only(left: 3, bottom: 2),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF59E0B),
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 1),
+      child: _MiniOrbitalSun(controller: _controller, size: 18),
     );
   }
 }

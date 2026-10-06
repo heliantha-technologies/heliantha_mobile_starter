@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -279,36 +281,242 @@ class _Shell extends StatelessWidget {
   }
 }
 
-class _QuoteNavIcon extends StatelessWidget {
+class _QuoteNavIcon extends StatefulWidget {
   const _QuoteNavIcon({required this.selected});
 
   final bool selected;
 
   @override
+  State<_QuoteNavIcon> createState() => _QuoteNavIconState();
+}
+
+class _QuoteNavIconState extends State<_QuoteNavIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 7500),
+    );
+    if (widget.selected) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.stop();
+      _controller.value = 0;
+    } else if (widget.selected && !_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _QuoteNavIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected != oldWidget.selected) {
+      if (widget.selected) {
+        if (!MediaQuery.disableAnimationsOf(context)) {
+          _controller.repeat();
+        }
+      } else {
+        _controller.stop();
+        _controller.reset();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: selected ? AppColors.sun : AppColors.navy,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: selected ? AppColors.premiumLine : AppColors.navy,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.navy.withValues(alpha: selected ? 0.16 : 0.10),
-            blurRadius: selected ? 14 : 10,
-            offset: const Offset(0, 6),
+    final selected = widget.selected;
+
+    return Semantics(
+      label: selected ? 'Devis actif' : 'Devis',
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFFF59E0B)
+                : const Color(0xFFCBD5E1).withValues(alpha: 0.35),
+            width: selected ? 1.6 : 1.0,
           ),
-        ],
-      ),
-      child: Icon(
-        selected ? Icons.solar_power_rounded : Icons.calculate_outlined,
-        color: selected ? AppColors.navy : Colors.white,
-        size: 22,
+          boxShadow: [
+            BoxShadow(
+              color: selected
+                  ? const Color(0xFFF59E0B).withValues(alpha: 0.35)
+                  : const Color(0xFF0F172A).withValues(alpha: 0.16),
+              blurRadius: selected ? 12 : 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final t = selected ? _controller.value : 0.0;
+            return CustomPaint(
+              size: const Size(26, 26),
+              painter: _NavOrbitalSunPainter(
+                spin: t,
+                pulse: selected ? (math.sin(t * 4 * math.pi) + 1) / 2 : 0.0,
+                selected: selected,
+              ),
+            );
+          },
+        ),
       ),
     );
   }
+}
+
+class _NavOrbitalSunPainter extends CustomPainter {
+  const _NavOrbitalSunPainter({
+    required this.spin,
+    required this.pulse,
+    required this.selected,
+  });
+
+  final double spin;
+  final double pulse;
+  final bool selected;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide / 2;
+    final coreRadius = radius * (selected ? (0.34 + 0.04 * pulse) : 0.34);
+
+    // 1. Halo doux doré si actif
+    if (selected) {
+      canvas.drawCircle(
+        center,
+        radius * (0.80 + 0.08 * pulse),
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              const Color(0xFFFDE68A).withValues(alpha: 0.50),
+              const Color(0xFFFDE68A).withValues(alpha: 0.0),
+            ],
+          ).createShader(Rect.fromCircle(center: center, radius: radius)),
+      );
+    }
+
+    // 2. Anneau d'orbite pointillé bleu cyan
+    final orbitRadius = radius * 0.88;
+    final orbitPaint = Paint()
+      ..color = selected
+          ? const Color(0xFF38BDF8).withValues(alpha: 0.55)
+          : const Color(0xFF94A3B8).withValues(alpha: 0.35)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    const dashCount = 18;
+    for (var i = 0; i < dashCount; i += 2) {
+      final a0 = (i / dashCount) * 2 * math.pi;
+      final a1 = ((i + 1) / dashCount) * 2 * math.pi;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: orbitRadius),
+        a0,
+        a1 - a0,
+        false,
+        orbitPaint,
+      );
+    }
+
+    // 3. Rayons solaires dorés (en rotation douce si actif, fixes si inactif)
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(spin * 2 * math.pi);
+    const rayCount = 8;
+    for (var i = 0; i < rayCount; i++) {
+      final isLong = i.isEven;
+      final inner = coreRadius + 1.2;
+      final outer = coreRadius + (isLong ? 3.4 : 2.4);
+      final rayPaint = Paint()
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = isLong ? 1.8 : 1.3
+        ..color = selected
+            ? (isLong ? const Color(0xFFF59E0B) : const Color(0xFFFBBF24))
+                .withValues(alpha: isLong ? 0.95 : 0.80)
+            : Colors.white.withValues(alpha: isLong ? 0.85 : 0.65);
+      final angle = (i / rayCount) * 2 * math.pi;
+      final dir = Offset(math.cos(angle), math.sin(angle));
+      canvas.drawLine(dir * inner, dir * outer, rayPaint);
+    }
+    canvas.restore();
+
+    // 4. Cœur du soleil dégradé chaud
+    final coreRect = Rect.fromCircle(center: center, radius: coreRadius);
+    canvas.drawCircle(
+      center,
+      coreRadius,
+      Paint()
+        ..shader = selected
+            ? const RadialGradient(
+                center: Alignment(-0.35, -0.35),
+                colors: [Color(0xFFFFF7CC), Color(0xFFFCD34D), Color(0xFFF59E0B)],
+                stops: [0.0, 0.45, 1.0],
+              ).createShader(coreRect)
+            : const RadialGradient(
+                center: Alignment(-0.35, -0.35),
+                colors: [Color(0xFFFFFFFF), Color(0xFFCBD5E1)],
+                stops: [0.0, 1.0],
+              ).createShader(coreRect),
+    );
+
+    // 5. Petit satellite d'énergie en orbite
+    final satAngle = selected
+        ? (-spin * 2 * math.pi * 2 - math.pi / 2)
+        : -math.pi / 4;
+    final satPos = center +
+        Offset(math.cos(satAngle), math.sin(satAngle)) * orbitRadius;
+    if (selected) {
+      canvas.drawCircle(
+        satPos,
+        3.2,
+        Paint()
+          ..color = const Color(0xFF38BDF8).withValues(alpha: 0.45)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+      );
+      canvas.drawCircle(
+        satPos,
+        2.0,
+        Paint()..color = const Color(0xFF0EA5E9),
+      );
+      canvas.drawCircle(
+        satPos,
+        0.9,
+        Paint()..color = Colors.white,
+      );
+    } else {
+      canvas.drawCircle(
+        satPos,
+        1.8,
+        Paint()..color = const Color(0xFF38BDF8).withValues(alpha: 0.70),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_NavOrbitalSunPainter oldDelegate) =>
+      oldDelegate.spin != spin ||
+      oldDelegate.pulse != pulse ||
+      oldDelegate.selected != selected;
 }

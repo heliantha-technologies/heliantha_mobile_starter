@@ -456,32 +456,35 @@ class AppActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = danger ? AppColors.danger : AppColors.blue;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.xs,
-      ),
-      onTap: onTap,
-      leading: AppIconBadge(
-        icon: icon,
-        color: color,
-        backgroundColor: danger ? const Color(0xFFFFEFEF) : AppColors.softBlue,
-      ),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: danger ? AppColors.danger : AppColors.ink,
-              fontWeight: FontWeight.w900,
-            ),
-      ),
-      subtitle: Text(
-        subtitle,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Icon(
-        Icons.chevron_right_rounded,
-        color: danger ? AppColors.danger : AppColors.muted,
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        onTap: onTap,
+        leading: AppIconBadge(
+          icon: icon,
+          color: color,
+          backgroundColor: danger ? const Color(0xFFFFEFEF) : AppColors.softBlue,
+        ),
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: danger ? AppColors.danger : AppColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+        ),
+        subtitle: Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Icon(
+          Icons.chevron_right_rounded,
+          color: danger ? AppColors.danger : AppColors.muted,
+        ),
       ),
     );
   }
