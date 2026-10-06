@@ -2,21 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heliantha_mobile/features/assistant/data/assistant_api_service.dart';
+import 'package:heliantha_mobile/features/assistant/data/assistant_reply.dart';
 import 'package:heliantha_mobile/features/assistant/presentation/widgets/ai_chat_bottom_sheet.dart';
 
 class _FakeAssistantApiService extends AssistantApiService {
   @override
-  Future<String> sendMessage({
+  Future<AssistantReply> sendReply({
     required List<Map<String, String>> history,
     String? contextPrompt,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 200));
-    return 'Bonjour ! HeliAntha est ravi de vous accompagner.';
+    return const AssistantReply(
+        text: 'Bonjour ! HeliAntha est ravi de vous accompagner.');
   }
 }
 
 void main() {
-  testWidgets('Le bouton d’envoi affiche la flèche puis le soleil orbital', (tester) async {
+  testWidgets('Le bouton d’envoi affiche la flèche puis le soleil orbital',
+      (tester) async {
     final fakeService = _FakeAssistantApiService();
 
     await tester.pumpWidget(
@@ -61,4 +64,3 @@ void main() {
     expect(find.textContaining('HeliAntha est ravi'), findsOneWidget);
   });
 }
-

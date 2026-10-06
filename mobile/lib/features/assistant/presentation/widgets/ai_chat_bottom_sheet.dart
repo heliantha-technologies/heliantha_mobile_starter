@@ -11,6 +11,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../shared/widgets/brand_widgets.dart';
 import '../../data/assistant_api_service.dart';
+import '../../data/assistant_reply.dart';
+import 'assistant_product_card.dart';
 
 /// Modèle de données pour les devis calculés par AssistantDevisManager
 class ChatDevisData {
@@ -166,6 +168,7 @@ class _ChatMessage {
   bool isStreaming = false;
   String thinkingStep;
   ChatDevisData? devisData;
+  List<AssistantProduct> suggestedProducts = const [];
 
   bool get isUser => role == 'user';
 }
@@ -483,7 +486,7 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
 
     try {
       final apiService = ref.read(assistantApiServiceProvider);
-      final rawReply = await apiService.sendMessage(
+      final reply = await apiService.sendReply(
         history: history,
         contextPrompt: widget.contextPrompt,
       );
@@ -492,7 +495,7 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
 
       if (mounted) {
         // Extraction et nettoyage des métadonnées devis
-        final parsed = ChatDevisData.extract(rawReply);
+        final parsed = ChatDevisData.extract(reply.text);
         final cleanText = parsed.cleanedText;
 
         setState(() {
@@ -500,6 +503,7 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
           assistantMessage.thinkingStep = '';
           assistantMessage.text = cleanText;
           assistantMessage.devisData = parsed.devisData;
+          assistantMessage.suggestedProducts = reply.suggestedProducts;
         });
         _streamResponse(assistantMessage, cleanText);
       }
@@ -684,12 +688,16 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
                           ),
                         ),
                         const SizedBox(width: 5),
-                        const Text(
-                          'En ligne • Analyse instantanée',
-                          style: TextStyle(
-                            color: Color(0xFF10B981),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11.5,
+                        const Flexible(
+                          child: Text(
+                            'En ligne • Analyse instantanée',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Color(0xFF10B981),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11.5,
+                            ),
                           ),
                         ),
                       ],
@@ -981,6 +989,11 @@ class _ChatMessageTile extends StatelessWidget {
                       devis: message.devisData!,
                     ),
                   ],
+                  if (!message.isThinking && !message.isStreaming)
+                    for (final product in message.suggestedProducts) ...[
+                      const SizedBox(height: 12),
+                      AssistantProductCard(product: product),
+                    ],
                 ],
               ),
             ),
@@ -1187,8 +1200,8 @@ class _MiniSunPainter extends CustomPainter {
 
     // 5. Petit satellite d'énergie en orbite dynamique
     final satAngle = -spin * 2 * math.pi * 2 - math.pi / 2;
-    final satPos = center +
-        Offset(math.cos(satAngle), math.sin(satAngle)) * orbitRadius;
+    final satPos =
+        center + Offset(math.cos(satAngle), math.sin(satAngle)) * orbitRadius;
     canvas.drawCircle(
       satPos,
       3.2,
@@ -1511,8 +1524,10 @@ class _ChatMessageQuoteCardState extends State<_ChatMessageQuoteCard>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 1. En-tête : Badge vert discret & Référence
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -1536,12 +1551,14 @@ class _ChatMessageQuoteCardState extends State<_ChatMessageQuoteCard>
                           size: 13,
                         ),
                         SizedBox(width: 4),
-                        Text(
-                          '✓ Devis officiel calculé',
-                          style: TextStyle(
-                            color: Color(0xFF047857),
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
+                        Flexible(
+                          child: Text(
+                            '✓ Devis officiel calculé',
+                            style: TextStyle(
+                              color: Color(0xFF047857),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
@@ -1658,7 +1675,10 @@ class _ChatMessageQuoteCardState extends State<_ChatMessageQuoteCard>
                   onTap: () => _handleDownload(context),
                   borderRadius: BorderRadius.circular(16),
                   child: Ink(
-                    height: 46,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         begin: Alignment.topLeft,
@@ -1684,13 +1704,16 @@ class _ChatMessageQuoteCardState extends State<_ChatMessageQuoteCard>
                           size: 19,
                         ),
                         SizedBox(width: 8),
-                        Text(
-                          'Télécharger mon Devis PDF',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
+                        Expanded(
+                          child: Text(
+                            'Télécharger mon Devis PDF',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                            ),
                           ),
                         ),
                         SizedBox(width: 6),

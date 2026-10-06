@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
+import 'assistant_reply.dart';
 
 final assistantApiServiceProvider = Provider<AssistantApiService>((ref) {
   return AssistantApiService();
@@ -45,6 +46,12 @@ class AssistantApiService {
   Future<String> sendMessage({
     required List<Map<String, String>> history,
     String? contextPrompt,
+  }) async =>
+      (await sendReply(history: history, contextPrompt: contextPrompt)).text;
+
+  Future<AssistantReply> sendReply({
+    required List<Map<String, String>> history,
+    String? contextPrompt,
   }) async {
     final formattedMessages = <Map<String, String>>[];
 
@@ -67,7 +74,10 @@ class AssistantApiService {
     }
 
     if (formattedMessages.isEmpty) {
-      return 'Bonjour ! Comment puis-je vous accompagner dans votre projet solaire ?';
+      return const AssistantReply(
+        text:
+            'Bonjour ! Comment puis-je vous accompagner dans votre projet solaire ?',
+      );
     }
 
     try {
@@ -97,50 +107,70 @@ class AssistantApiService {
             json = decoded;
           }
         } catch (_) {
-          return rawData.trim();
+          return AssistantReply(text: rawData.trim());
         }
       }
 
       if (json != null) {
-        final answer = json['content'] ??
-            json['reply'] ??
-            json['message'] ??
-            json['text'];
+        final products =
+            AssistantReply.parseProducts(json['suggested_products']);
+        final answer =
+            json['content'] ?? json['reply'] ?? json['message'] ?? json['text'];
         final devisMap = json['devis'] ?? json['quote'];
         if (answer != null && answer.toString().trim().isNotEmpty) {
           var text = answer.toString().trim();
           if (devisMap is Map && !text.contains('<<<DEVIS_DATA:')) {
             text += '\n\n<<<DEVIS_DATA: ${jsonEncode(devisMap)}>>>';
           }
-          return text;
+          return AssistantReply(text: text, suggestedProducts: products);
         } else if (devisMap is Map) {
-          return '<<<DEVIS_DATA: ${jsonEncode(devisMap)}>>>';
+          return AssistantReply(
+            text: '<<<DEVIS_DATA: ${jsonEncode(devisMap)}>>>',
+            suggestedProducts: products,
+          );
+        } else if (products.isNotEmpty) {
+          return AssistantReply(
+            text: 'Voici les produits proposés pour votre demande :',
+            suggestedProducts: products,
+          );
         }
       }
 
-      if (rawData is String && rawData.trim().isNotEmpty) {
-        return rawData.trim();
+      if (json == null && rawData is String && rawData.trim().isNotEmpty) {
+        return AssistantReply(text: rawData.trim());
       }
 
-      return "Je n'ai pas pu traiter votre demande.";
+      return const AssistantReply(
+          text: "Je n'ai pas pu traiter votre demande.");
     } on TimeoutException {
-      return 'Votre conseiller HeliAntha prend un instant de plus pour affiner son analyse. N’hésitez pas à relancer votre question, nous sommes à votre entière disposition.';
+      return const AssistantReply(
+          text:
+              'Votre conseiller HeliAntha prend un instant de plus pour affiner son analyse. N’hésitez pas à relancer votre question, nous sommes à votre entière disposition.');
     } on DioException catch (dioError) {
       if (dioError.response?.statusCode == 429) {
-        return 'Vous avez beaucoup échangé avec notre conseiller solaire. Merci de patienter quelques instants avant de poursuivre votre conversation.';
+        return const AssistantReply(
+            text:
+                'Vous avez beaucoup échangé avec notre conseiller solaire. Merci de patienter quelques instants avant de poursuivre votre conversation.');
       }
       if (dioError.type == DioExceptionType.connectionTimeout ||
           dioError.type == DioExceptionType.receiveTimeout ||
           dioError.type == DioExceptionType.sendTimeout) {
-        return 'Votre conseiller HeliAntha finalise votre étude personnalisée. Merci de renouveler votre question si elle ne s’affiche pas immédiatement.';
+        return const AssistantReply(
+            text:
+                'Votre conseiller HeliAntha finalise votre étude personnalisée. Merci de renouveler votre question si elle ne s’affiche pas immédiatement.');
       }
       if (dioError.type == DioExceptionType.connectionError) {
-        return 'Votre connexion réseau semble interrompue. Vérifiez votre accès Internet pour échanger avec notre conseiller.';
+        return const AssistantReply(
+            text:
+                'Votre connexion réseau semble interrompue. Vérifiez votre accès Internet pour échanger avec notre conseiller.');
       }
-      return 'Nos échanges sont momentanément interrompus. Nos conseillers solaires restent immédiatement à votre écoute par téléphone ou sur WhatsApp.';
+      return const AssistantReply(
+          text:
+              'Nos échanges sont momentanément interrompus. Nos conseillers solaires restent immédiatement à votre écoute par téléphone ou sur WhatsApp.');
     } catch (_) {
-      return 'Un contretemps est survenu lors de l’échange. Nos conseillers solaires se tiennent à votre disposition par WhatsApp ou téléphone pour vous répondre.';
+      return const AssistantReply(
+          text:
+              'Un contretemps est survenu lors de l’échange. Nos conseillers solaires se tiennent à votre disposition par WhatsApp ou téléphone pour vous répondre.');
     }
   }
 }
-

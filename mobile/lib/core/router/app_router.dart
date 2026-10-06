@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/account/presentation/account_screen.dart';
 import '../../features/addresses/presentation/addresses_screen.dart';
+import '../../features/assistant/presentation/widgets/ai_floating_orb.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
@@ -201,7 +202,22 @@ class _Shell extends StatelessWidget {
         left: false,
         right: false,
         bottom: false,
-        child: shell,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            shell,
+            if (shell.currentIndex == 0 || shell.currentIndex == 1)
+              Positioned.fill(
+                child: TickerMode(
+                  enabled: !MediaQuery.disableAnimationsOf(context),
+                  child: const AiFloatingOrb(
+                    key: ValueKey('main-assistant-orb'),
+                    initialBottomMargin: 20,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
       bottomNavigationBar: Material(
         color: Theme.of(context).colorScheme.surface,
@@ -471,7 +487,11 @@ class _NavOrbitalSunPainter extends CustomPainter {
         ..shader = selected
             ? const RadialGradient(
                 center: Alignment(-0.35, -0.35),
-                colors: [Color(0xFFFFF7CC), Color(0xFFFCD34D), Color(0xFFF59E0B)],
+                colors: [
+                  Color(0xFFFFF7CC),
+                  Color(0xFFFCD34D),
+                  Color(0xFFF59E0B)
+                ],
                 stops: [0.0, 0.45, 1.0],
               ).createShader(coreRect)
             : const RadialGradient(
@@ -482,11 +502,10 @@ class _NavOrbitalSunPainter extends CustomPainter {
     );
 
     // 5. Petit satellite d'énergie en orbite
-    final satAngle = selected
-        ? (-spin * 2 * math.pi * 2 - math.pi / 2)
-        : -math.pi / 4;
-    final satPos = center +
-        Offset(math.cos(satAngle), math.sin(satAngle)) * orbitRadius;
+    final satAngle =
+        selected ? (-spin * 2 * math.pi * 2 - math.pi / 2) : -math.pi / 4;
+    final satPos =
+        center + Offset(math.cos(satAngle), math.sin(satAngle)) * orbitRadius;
     if (selected) {
       canvas.drawCircle(
         satPos,

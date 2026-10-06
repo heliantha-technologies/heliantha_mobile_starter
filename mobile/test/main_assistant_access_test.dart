@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heliantha_mobile/core/router/app_router.dart';
 import 'package:heliantha_mobile/features/assistant/data/assistant_api_service.dart';
+import 'package:heliantha_mobile/features/assistant/data/assistant_reply.dart';
 import 'package:heliantha_mobile/features/assistant/presentation/widgets/ai_chat_bottom_sheet.dart';
 import 'package:heliantha_mobile/features/assistant/presentation/widgets/ai_floating_orb.dart';
 import 'package:heliantha_mobile/features/auth/providers/auth_provider.dart';
@@ -60,12 +61,12 @@ class _RecordingAssistantService extends AssistantApiService {
   int calls = 0;
 
   @override
-  Future<String> sendMessage({
+  Future<AssistantReply> sendReply({
     required List<Map<String, String>> history,
     String? contextPrompt,
   }) async {
     calls++;
-    return 'Réponse locale de test';
+    return const AssistantReply(text: 'Réponse locale de test');
   }
 }
 
