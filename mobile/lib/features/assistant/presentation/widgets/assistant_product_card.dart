@@ -1,8 +1,11 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../shared/theme/app_vector_icons.dart';
+import '../../../../shared/utils/api_url.dart';
 import '../../../../shared/utils/money.dart';
 import '../../data/assistant_reply.dart';
 
@@ -254,6 +257,114 @@ class AssistantProductCard extends StatelessWidget {
   }
 }
 
+/// Résolution robuste de l'image réelle du produit depuis le catalogue HeliAntha.
+String? _resolveEquipmentImage(AssistantProduct product) {
+  if (product.imageUrl != null && product.imageUrl!.trim().isNotEmpty) {
+    return product.imageUrl!.trim();
+  }
+
+  final rawRef = (product.reference ?? '').toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  final rawName = product.name.toUpperCase();
+  final rawDesc = (product.description ?? '').toUpperCase();
+  final search = '$rawRef $rawName $rawDesc';
+
+  // 1. Onduleurs
+  if (search.contains('DEYESUN') ||
+      search.contains('SUN18K') ||
+      search.contains('SUN10K') ||
+      search.contains('SUN6K') ||
+      search.contains('18KW') ||
+      search.contains('10KW') ||
+      search.contains('6KW') ||
+      (search.contains('DEYE') && search.contains('ONDULEUR'))) {
+    return '/v1/products/331/image?image_id=552'; // Onduleur Hybride Deye 18kW
+  }
+  if (search.contains('MUST') || search.contains('PV18')) {
+    return '/v1/products/340/image?image_id=580'; // Onduleur Must 3.6kW
+  }
+  if (search.contains('SOLAX') || search.contains('X3') || search.contains('X1')) {
+    return '/v1/products/248/image?image_id=351'; // Onduleur SolaX Hybride
+  }
+
+  // 2. Panneaux solaires
+  if (search.contains('JINKO') || search.contains('725') || search.contains('TIGER')) {
+    return '/v1/products/342/image?image_id=583'; // Jinko 725W Tiger Neo
+  }
+  if (search.contains('CANADIAN') ||
+      search.contains('CS6W') ||
+      search.contains('CS7N') ||
+      search.contains('705') ||
+      search.contains('590') ||
+      search.contains('585')) {
+    return '/v1/products/341/image?image_id=582'; // Canadian Solar 705W / 590W
+  }
+  if (search.contains('610') || search.contains('JKM610')) {
+    return '/v1/products/256/image?image_id=360'; // Jinko 610W Bifacial
+  }
+  if (search.contains('400') ||
+      search.contains('RISEN') ||
+      search.contains('ONGRIDPV400') ||
+      search.contains('TESTJA400')) {
+    return '/v1/products/310/image?image_id=510'; // Panneau Risen / On-Grid 400W
+  }
+  if (search.contains('715') || search.contains('720')) {
+    return '/v1/products/342/image?image_id=583'; // Panneau 715W / 725W
+  }
+
+  // 3. Batteries
+  if (search.contains('MES') || search.contains('LBM') || search.contains('5220')) {
+    return '/v1/products/343/image?image_id=584'; // Batterie MES 5.22kWh
+  }
+  if (search.contains('BATDEYE5') ||
+      search.contains('SEF5') ||
+      (search.contains('DEYE') && search.contains('5KWH'))) {
+    return '/v1/products/330/image?image_id=545'; // Batterie Deye 5.32kWh
+  }
+  if (search.contains('BATDEYE15') ||
+      search.contains('LP16') ||
+      search.contains('15KWH') ||
+      (search.contains('MUST') && search.contains('BATTERIE'))) {
+    return '/v1/products/270/image?image_id=463'; // Batterie Must / Deye 15kWh
+  }
+  if (search.contains('DYNESS') || search.contains('POWERBRICK')) {
+    return '/v1/products/319/image?image_id=521'; // Batterie Dyness
+  }
+
+  // 4. Variateurs & Pompes
+  if (search.contains('INOMAX') || search.contains('MAX500') || search.contains('SI23')) {
+    return '/v1/products/338/image?image_id=576'; // Variateur Inomax 4kW
+  }
+  if (search.contains('INVT') || search.contains('GD100') || search.contains('HELINVT')) {
+    return '/v1/products/337/image?image_id=573'; // Variateur INVT 2.2kW
+  }
+  if (search.contains('LEO') ||
+      search.contains('4XR') ||
+      search.contains('3XR') ||
+      search.contains('POMPE') ||
+      search.contains('ELECTROPOMPE')) {
+    return '/v1/products/301/image?image_id=493'; // Pompe immergée LEO
+  }
+
+  // 5. Familles génériques si mention spécifique
+  if (search.contains('ONDULEUR') || search.contains('INVERTER') || search.contains('HYBRIDE')) {
+    return '/v1/products/331/image?image_id=552';
+  }
+  if (search.contains('BATTERIE') ||
+      search.contains('LITHIUM') ||
+      search.contains('LIFEPO4') ||
+      search.contains('STOCKAGE')) {
+    return '/v1/products/330/image?image_id=545';
+  }
+  if (search.contains('PANNEAU') || search.contains('PHOTOVOLTAIQUE')) {
+    return '/v1/products/342/image?image_id=583';
+  }
+  if (search.contains('VARIATEUR') || search.contains('VFD')) {
+    return '/v1/products/337/image?image_id=573';
+  }
+
+  return null;
+}
+
 /// Vignette photo intelligente avec support URL distante ou fallback réaliste.
 class _AssistantProductThumbnail extends StatelessWidget {
   const _AssistantProductThumbnail({
@@ -264,11 +375,23 @@ class _AssistantProductThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (product.imageUrl != null && product.imageUrl!.trim().isNotEmpty) {
-      return Image.network(
-        product.imageUrl!,
+    final rawUrl = _resolveEquipmentImage(product);
+    final url = absoluteApiUrl(rawUrl);
+
+    if (url.isNotEmpty) {
+      if (kIsWeb) {
+        return Image.network(
+          url,
+          fit: BoxFit.cover,
+          headers: const {'Accept': 'image/*'},
+          errorBuilder: (_, __, ___) => _buildRealisticFallback(),
+        );
+      }
+      return CachedNetworkImage(
+        imageUrl: url,
+        httpHeaders: const {'Accept': 'image/*'},
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildRealisticFallback(),
+        errorWidget: (_, __, ___) => _buildRealisticFallback(),
       );
     }
 
@@ -278,16 +401,10 @@ class _AssistantProductThumbnail extends StatelessWidget {
   Widget _buildRealisticFallback() {
     final lowerName = '${product.name} ${product.reference ?? ''}'.toLowerCase();
 
-    // Détection du type de produit pour une photo / un visuel contextuel
-    final isPanel = lowerName.contains('panneau') ||
-        lowerName.contains('bifacial') ||
-        lowerName.contains('mono') ||
-        lowerName.contains('wc') ||
-        lowerName.contains('tiger');
-
+    // Détection rigoureuse par type : Onduleurs en premier pour ne pas confondre "monophasé" avec un panneau !
     final isInverter = lowerName.contains('onduleur') ||
-        lowerName.contains('hybride') ||
         lowerName.contains('inverter') ||
+        lowerName.contains('hybride') ||
         lowerName.contains('deye') ||
         lowerName.contains('growatt');
 
@@ -299,6 +416,13 @@ class _AssistantProductThumbnail extends StatelessWidget {
     final isPump = lowerName.contains('pompe') ||
         lowerName.contains('pompage') ||
         lowerName.contains('variateur');
+
+    final isPanel = lowerName.contains('panneau') ||
+        lowerName.contains('photovoltaïque') ||
+        lowerName.contains('photovoltaique') ||
+        lowerName.contains('bifacial') ||
+        lowerName.contains('tiger') ||
+        (lowerName.contains('wc') && !isInverter);
 
     if (isPanel) {
       return Stack(
