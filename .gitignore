@@ -57,3 +57,5 @@ backend/secrets/
 *firebase-admin*.json
 
 mobile/android/key.properties
+
+*.sqlite3*
