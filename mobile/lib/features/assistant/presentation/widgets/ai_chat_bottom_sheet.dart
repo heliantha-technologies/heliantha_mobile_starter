@@ -1173,11 +1173,12 @@ class _ChatMessageTile extends StatelessWidget {
                       devis: message.devisData!,
                     ),
                   ],
-                  if (!message.isThinking && !message.isStreaming)
-                    for (final product in message.suggestedProducts) ...[
-                      const SizedBox(height: 12),
-                      AssistantProductCard(product: product),
-                    ],
+                  if (!message.isThinking &&
+                      !message.isStreaming &&
+                      message.suggestedProducts.isNotEmpty)
+                    AssistantProductsCarousel(
+                      products: message.suggestedProducts,
+                    ),
                   if (message.offerWhatsApp &&
                       !message.isThinking &&
                       !message.isStreaming) ...[

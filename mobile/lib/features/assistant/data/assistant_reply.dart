@@ -11,6 +11,7 @@ class AssistantProduct {
     this.priceTax = 'HT',
     this.inStock,
     this.datasheetUri,
+    this.imageUrl,
   });
 
   final String name;
@@ -22,6 +23,7 @@ class AssistantProduct {
   final String priceTax;
   final bool? inStock;
   final Uri? datasheetUri;
+  final String? imageUrl;
 
   static AssistantProduct? fromJson(Map<String, dynamic> json) {
     final name = _text(json['name']);
@@ -29,6 +31,7 @@ class AssistantProduct {
     final currency = _text(json['currency'])?.toUpperCase() ?? 'DH';
     final tax = _text(json['price_tax'])?.toUpperCase();
     final uri = Uri.tryParse(_text(json['datasheet_url']) ?? '');
+    final image = _text(json['image_url']) ?? _text(json['image']) ?? _text(json['photo']);
     return AssistantProduct(
       name: name,
       localId: _text(json['id']),
@@ -43,6 +46,7 @@ class AssistantProduct {
               uri.host.isNotEmpty
           ? uri
           : null,
+      imageUrl: image,
     );
   }
 
@@ -89,6 +93,7 @@ class AssistantProduct {
         'price_tax': priceTax,
         if (inStock != null) 'en_stock': inStock,
         if (datasheetUri != null) 'datasheet_url': datasheetUri.toString(),
+        if (imageUrl != null) 'image_url': imageUrl,
       };
 }
 
