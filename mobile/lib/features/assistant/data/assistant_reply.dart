@@ -78,6 +78,18 @@ class AssistantProduct {
     final stock = quantity is num ? quantity : num.tryParse('$quantity');
     return stock == null ? null : stock > 0;
   }
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        if (localId != null) 'id': localId,
+        if (reference != null) 'reference': reference,
+        if (description != null) 'description': description,
+        if (price != null) 'price': price,
+        'currency': currency,
+        'price_tax': priceTax,
+        if (inStock != null) 'en_stock': inStock,
+        if (datasheetUri != null) 'datasheet_url': datasheetUri.toString(),
+      };
 }
 
 class AssistantReply {

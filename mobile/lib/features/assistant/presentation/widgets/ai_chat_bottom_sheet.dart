@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/app_config.dart';
@@ -33,6 +34,16 @@ class ChatDevisData {
   final String? inverter;
   final String? pdfUrl;
   final Map<String, dynamic> raw;
+
+  Map<String, dynamic> toJson() => {
+        'ref': reference,
+        'total_ttc': totalTtc,
+        if (powerKwc != null) 'power_kwc': powerKwc,
+        if (panelCount != null) 'panel_count': panelCount,
+        if (inverter != null) 'inverter': inverter,
+        if (pdfUrl != null) 'pdf_url': pdfUrl,
+        if (raw.isNotEmpty) 'raw': raw,
+      };
 
   static final regex = RegExp(
     r'<<<DEVIS_DATA:\s*(\{.*?\})\s*>>>',
@@ -172,6 +183,51 @@ class _ChatMessage {
   bool offerWhatsApp = false;
 
   bool get isUser => role == 'user';
+
+  Map<String, dynamic> toJson() => {
+        'role': role,
+        'text': text,
+        'timestamp': timestamp.toIso8601String(),
+        'offer_whatsapp': offerWhatsApp,
+        if (devisData != null) 'devis_data': devisData!.toJson(),
+        if (suggestedProducts.isNotEmpty)
+          'suggested_products':
+              suggestedProducts.map((p) => p.toJson()).toList(),
+      };
+
+  static _ChatMessage? fromJson(Map<String, dynamic> json) {
+    final role = json['role']?.toString() ?? 'assistant';
+    final text = json['text']?.toString() ?? '';
+    if (text.isEmpty && role == 'user') return null;
+    final timestamp =
+        DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
+            DateTime.now();
+
+    final msg = _ChatMessage(
+      role: role,
+      text: text,
+      displayedText: text,
+      timestamp: timestamp,
+    );
+    msg.offerWhatsApp = json['offer_whatsapp'] == true;
+
+    if (json['devis_data'] is Map<String, dynamic>) {
+      msg.devisData =
+          ChatDevisData.fromJson(json['devis_data'] as Map<String, dynamic>);
+    }
+
+    if (json['suggested_products'] is List) {
+      final list = <AssistantProduct>[];
+      for (final item in json['suggested_products'] as List) {
+        if (item is Map<String, dynamic>) {
+          final p = AssistantProduct.fromJson(item);
+          if (p != null) list.add(p);
+        }
+      }
+      msg.suggestedProducts = list;
+    }
+    return msg;
+  }
 }
 
 class _ChatSuggestion {
@@ -314,31 +370,34 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
     ),
   ];
 
+  static const _chatHistoryKey = 'heliantha_chat_history';
+
+  static const _welcomeMessage =
+      'Bonjour ! Je suis votre conseiller solaire HeliAntha.\n\n'
+      'Je suis à votre disposition pour vous orienter sur nos solutions : '
+      'pompage solaire, réduction de facture, batteries, site isolé, chauffe-eau ou borne de recharge.\n\n'
+      'Comment puis-je vous accompagner aujourd\'hui ?';
+
+  _ChatMessage _createWelcomeMessage() => _ChatMessage(
+        role: 'assistant',
+        text: _welcomeMessage,
+        displayedText: _welcomeMessage,
+        timestamp: DateTime.now(),
+      );
+
   @override
   void initState() {
     super.initState();
 
-    // Message d'accueil pro, chaleureux et concis
-    const welcome = 'Bonjour ! Je suis votre conseiller solaire HeliAntha.\n\n'
-        'Je suis à votre disposition pour vous orienter sur nos solutions : '
-        'pompage solaire, réduction de facture, batteries, site isolé, chauffe-eau ou borne de recharge.\n\n'
-        'Comment puis-je vous accompagner aujourd\'hui ?';
+    _messages.add(_createWelcomeMessage());
 
-    _messages.add(
-      _ChatMessage(
-        role: 'assistant',
-        text: welcome,
-        displayedText: welcome,
-        timestamp: DateTime.now(),
-      ),
-    );
-
-    // Si une question initiale a été passée
     if (widget.initialQuestion != null &&
         widget.initialQuestion!.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _submitUserMessage(widget.initialQuestion!.trim());
       });
+    } else {
+      _loadMessagesFromCache();
     }
   }
 
@@ -346,10 +405,81 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
   void dispose() {
     _thinkingTimer?.cancel();
     _streamingTimer?.cancel();
+    _saveMessagesToCache();
     _textController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveMessagesToCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final validMessages = _messages
+          .where((m) => !m.isThinking && m.text.trim().isNotEmpty)
+          .map((m) => m.toJson())
+          .toList();
+      if (validMessages.isEmpty ||
+          (validMessages.length == 1 &&
+              validMessages.first['role'] == 'assistant' &&
+              validMessages.first['text'] == _welcomeMessage)) {
+        await prefs.remove(_chatHistoryKey);
+      } else {
+        await prefs.setString(_chatHistoryKey, jsonEncode(validMessages));
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de la sauvegarde du chat : $e');
+    }
+  }
+
+  Future<void> _loadMessagesFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_chatHistoryKey);
+      if (raw == null || raw.trim().isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is List && decoded.isNotEmpty) {
+        final loaded = <_ChatMessage>[];
+        for (final item in decoded) {
+          if (item is Map<String, dynamic>) {
+            final msg = _ChatMessage.fromJson(item);
+            if (msg != null) loaded.add(msg);
+          }
+        }
+        if (loaded.isNotEmpty && mounted) {
+          setState(() {
+            final activeNew =
+                _messages.where((m) => m.isUser || m.isThinking).toList();
+            if (activeNew.isEmpty) {
+              _messages.clear();
+              _messages.addAll(loaded);
+            }
+          });
+          _scrollToBottom(animated: false, settlePasses: 2);
+        }
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du chargement du chat : $e');
+    }
+  }
+
+  Future<void> _clearChatHistory() async {
+    HapticFeedback.lightImpact();
+    _thinkingTimer?.cancel();
+    _streamingTimer?.cancel();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_chatHistoryKey);
+    } catch (e) {
+      debugPrint('Erreur lors de la réinitialisation du chat : $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      _messages.clear();
+      _messages.add(_createWelcomeMessage());
+    });
+    _scrollToBottom(animated: false);
   }
 
   void _scrollToBottom({bool animated = true, int settlePasses = 0}) {
@@ -466,6 +596,7 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
       _messages.add(assistantMessage);
       _isLoading = true;
     });
+    _saveMessagesToCache();
 
     _scrollToBottom();
 
@@ -523,6 +654,7 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
           }
         });
         if (reply.offerWhatsApp) {
+          _saveMessagesToCache();
           _scrollToBottom(settlePasses: 3);
         } else {
           _streamResponse(assistantMessage, cleanText);
@@ -539,6 +671,7 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
           assistantMessage.offerWhatsApp = true;
           _isLoading = false;
         });
+        _saveMessagesToCache();
         _scrollToBottom(settlePasses: 3);
       }
     }
@@ -574,6 +707,7 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
           message.isStreaming = false;
           _isLoading = false;
           timer.cancel();
+          _saveMessagesToCache();
         }
       });
       if (shouldFollow && tickCount % 4 == 0) {
@@ -726,6 +860,35 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
                   ],
                 ),
               ),
+              // Bouton réinitialiser / Nouvelle discussion
+              Material(
+                color: Colors.transparent,
+                child: Tooltip(
+                  message: 'Nouvelle discussion',
+                  child: InkWell(
+                    key: const ValueKey('ai_chat_reset_button'),
+                    onTap: _clearChatHistory,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.refresh_rounded,
+                        color: Color(0xFF64748B),
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               // Bouton fermer discret
               Material(
                 color: Colors.transparent,
