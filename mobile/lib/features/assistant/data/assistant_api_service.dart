@@ -29,6 +29,11 @@ class AssistantApiService {
 
   final Dio _dio;
 
+  static const _quotaReply = AssistantReply(
+    text:
+        'Vous avez beaucoup échangé avec notre conseiller solaire. Merci de patienter quelques instants avant de poursuivre votre conversation.',
+  );
+
   static String get endpoint {
     if (kIsWeb) {
       final host = Uri.base.host;
@@ -95,6 +100,11 @@ class AssistantApiService {
         ),
       );
 
+      if (response.statusCode == 429) return _quotaReply;
+      if ((response.statusCode ?? 200) >= 400) {
+        return AssistantReply.unavailable;
+      }
+
       final rawData = response.data;
       Map<String, dynamic>? json;
 
@@ -105,9 +115,22 @@ class AssistantApiService {
           final decoded = jsonDecode(rawData);
           if (decoded is Map<String, dynamic>) {
             json = decoded;
+          } else {
+            return AssistantReply.unavailable;
           }
         } catch (_) {
-          return AssistantReply(text: rawData.trim());
+          final text = rawData.trim();
+          final contentType = response.headers
+                  .value(Headers.contentTypeHeader)
+                  ?.toLowerCase() ??
+              '';
+          if (contentType.contains('json') ||
+              text.startsWith('{') ||
+              text.startsWith('[') ||
+              (text.startsWith('<') && !text.startsWith('<<<DEVIS_DATA:'))) {
+            return AssistantReply.unavailable;
+          }
+          return AssistantReply(text: text);
         }
       }
 
@@ -117,21 +140,28 @@ class AssistantApiService {
         final answer =
             json['content'] ?? json['reply'] ?? json['message'] ?? json['text'];
         final devisMap = json['devis'] ?? json['quote'];
-        if (answer != null && answer.toString().trim().isNotEmpty) {
-          var text = answer.toString().trim();
+        final offerWhatsApp = json['offer_whatsapp'] == true;
+        if (answer is String && answer.trim().isNotEmpty) {
+          var text = answer.trim();
           if (devisMap is Map && !text.contains('<<<DEVIS_DATA:')) {
             text += '\n\n<<<DEVIS_DATA: ${jsonEncode(devisMap)}>>>';
           }
-          return AssistantReply(text: text, suggestedProducts: products);
+          return AssistantReply(
+            text: text,
+            suggestedProducts: products,
+            offerWhatsApp: offerWhatsApp,
+          );
         } else if (devisMap is Map) {
           return AssistantReply(
             text: '<<<DEVIS_DATA: ${jsonEncode(devisMap)}>>>',
             suggestedProducts: products,
+            offerWhatsApp: offerWhatsApp,
           );
         } else if (products.isNotEmpty) {
           return AssistantReply(
             text: 'Voici les produits proposés pour votre demande :',
             suggestedProducts: products,
+            offerWhatsApp: offerWhatsApp,
           );
         }
       }
@@ -140,37 +170,16 @@ class AssistantApiService {
         return AssistantReply(text: rawData.trim());
       }
 
-      return const AssistantReply(
-          text: "Je n'ai pas pu traiter votre demande.");
+      return AssistantReply.unavailable;
     } on TimeoutException {
-      return const AssistantReply(
-          text:
-              'Votre conseiller HeliAntha prend un instant de plus pour affiner son analyse. N’hésitez pas à relancer votre question, nous sommes à votre entière disposition.');
+      return AssistantReply.unavailable;
     } on DioException catch (dioError) {
       if (dioError.response?.statusCode == 429) {
-        return const AssistantReply(
-            text:
-                'Vous avez beaucoup échangé avec notre conseiller solaire. Merci de patienter quelques instants avant de poursuivre votre conversation.');
+        return _quotaReply;
       }
-      if (dioError.type == DioExceptionType.connectionTimeout ||
-          dioError.type == DioExceptionType.receiveTimeout ||
-          dioError.type == DioExceptionType.sendTimeout) {
-        return const AssistantReply(
-            text:
-                'Votre conseiller HeliAntha finalise votre étude personnalisée. Merci de renouveler votre question si elle ne s’affiche pas immédiatement.');
-      }
-      if (dioError.type == DioExceptionType.connectionError) {
-        return const AssistantReply(
-            text:
-                'Votre connexion réseau semble interrompue. Vérifiez votre accès Internet pour échanger avec notre conseiller.');
-      }
-      return const AssistantReply(
-          text:
-              'Nos échanges sont momentanément interrompus. Nos conseillers solaires restent immédiatement à votre écoute par téléphone ou sur WhatsApp.');
+      return AssistantReply.unavailable;
     } catch (_) {
-      return const AssistantReply(
-          text:
-              'Un contretemps est survenu lors de l’échange. Nos conseillers solaires se tiennent à votre disposition par WhatsApp ou téléphone pour vous répondre.');
+      return AssistantReply.unavailable;
     }
   }
 }

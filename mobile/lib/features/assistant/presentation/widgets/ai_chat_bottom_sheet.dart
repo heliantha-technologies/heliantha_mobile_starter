@@ -169,6 +169,7 @@ class _ChatMessage {
   String thinkingStep;
   ChatDevisData? devisData;
   List<AssistantProduct> suggestedProducts = const [];
+  bool offerWhatsApp = false;
 
   bool get isUser => role == 'user';
 }
@@ -351,22 +352,33 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
     super.dispose();
   }
 
-  void _scrollToBottom({bool animated = true}) {
+  void _scrollToBottom({bool animated = true, int settlePasses = 0}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
+      if (!mounted || !_scrollController.hasClients) return;
       final target = _scrollController.position.maxScrollExtent;
       if ((_scrollController.offset - target).abs() < 4) return;
 
       if (animated) {
-        _scrollController.animateTo(
+        final scrolling = _scrollController.animateTo(
           target,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOutCubic,
         );
+        if (settlePasses > 0) {
+          unawaited(scrolling.then((_) {
+            if (!mounted) return;
+            _scrollToBottom(animated: false, settlePasses: settlePasses - 1);
+          }));
+        }
       } else {
         _scrollController.jumpTo(target);
+        if (settlePasses > 0) {
+          _scrollToBottom(animated: false, settlePasses: settlePasses - 1);
+        }
       }
     });
+    // Immediate replies have no typewriter timer to request the next layout.
+    if (settlePasses > 0) WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   /// Génère une liste d'étapes de réflexion adaptées au sujet (chaleureux et rassurant)
@@ -504,8 +516,17 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
           assistantMessage.text = cleanText;
           assistantMessage.devisData = parsed.devisData;
           assistantMessage.suggestedProducts = reply.suggestedProducts;
+          assistantMessage.offerWhatsApp = reply.offerWhatsApp;
+          if (reply.offerWhatsApp) {
+            assistantMessage.displayedText = cleanText;
+            _isLoading = false;
+          }
         });
-        _streamResponse(assistantMessage, cleanText);
+        if (reply.offerWhatsApp) {
+          _scrollToBottom(settlePasses: 3);
+        } else {
+          _streamResponse(assistantMessage, cleanText);
+        }
       }
     } catch (_) {
       _thinkingTimer?.cancel();
@@ -513,12 +534,12 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
         setState(() {
           assistantMessage.isThinking = false;
           assistantMessage.thinkingStep = '';
-          assistantMessage.text =
-              'Désolé, une difficulté réseau est survenue. Veuillez vérifier votre connexion ou réessayer.';
+          assistantMessage.text = AssistantReply.unavailable.text;
           assistantMessage.displayedText = assistantMessage.text;
+          assistantMessage.offerWhatsApp = true;
           _isLoading = false;
         });
-        _scrollToBottom();
+        _scrollToBottom(settlePasses: 3);
       }
     }
   }
@@ -994,11 +1015,78 @@ class _ChatMessageTile extends StatelessWidget {
                       const SizedBox(height: 12),
                       AssistantProductCard(product: product),
                     ],
+                  if (message.offerWhatsApp &&
+                      !message.isThinking &&
+                      !message.isStreaming) ...[
+                    const SizedBox(height: 12),
+                    const _AssistantWhatsAppButton(),
+                  ],
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AssistantWhatsAppButton extends StatelessWidget {
+  const _AssistantWhatsAppButton();
+
+  Future<void> _contact(BuildContext context) async {
+    unawaited(HapticFeedback.lightImpact());
+    try {
+      final opened = await launchUrl(
+        AppConfig.supportWhatsAppUri(
+          message:
+              'Bonjour HeliAntha, je souhaite échanger avec un conseiller solaire.',
+        ),
+        mode: LaunchMode.externalApplication,
+      );
+      if (opened) return;
+    } catch (_) {
+      // The contact number remains available when launching is unsupported.
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Contactez-nous sur WhatsApp au ${AppConfig.supportWhatsAppDisplay}.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton(
+        key: const ValueKey('assistant_whatsapp_contact'),
+        onPressed: () => _contact(context),
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF19915E),
+          foregroundColor: Colors.white,
+          minimumSize: const Size(0, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.chat_bubble_outline_rounded, size: 20),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Contacter un conseiller sur WhatsApp',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

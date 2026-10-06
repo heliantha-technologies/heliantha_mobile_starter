@@ -84,11 +84,19 @@ class AssistantReply {
   const AssistantReply({
     required this.text,
     this.suggestedProducts = const [],
+    this.offerWhatsApp = false,
   });
+
+  static const unavailable = AssistantReply(
+    text:
+        'L’assistant est momentanément indisponible. Un conseiller peut vous aider.',
+    offerWhatsApp: true,
+  );
 
   /// Preserves the quote marker understood by the existing quote card parser.
   final String text;
   final List<AssistantProduct> suggestedProducts;
+  final bool offerWhatsApp;
 
   static List<AssistantProduct> parseProducts(dynamic raw) {
     if (raw is! List) return const [];
