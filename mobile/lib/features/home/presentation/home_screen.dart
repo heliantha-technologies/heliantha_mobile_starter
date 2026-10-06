@@ -679,9 +679,9 @@ class _ProductSlide extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          flex: 6,
+          flex: 5,
           child: Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppRadii.md),
               child: ColoredBox(
@@ -697,24 +697,27 @@ class _ProductSlide extends StatelessWidget {
           ),
         ),
         Expanded(
-          flex: 4,
+          flex: 5,
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  slide.title ?? '',
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.ink,
-                        fontWeight: FontWeight.w900,
-                        height: 1.18,
-                      ),
+                Flexible(
+                  child: Text(
+                    slide.title ?? '',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w900,
+                          height: 1.18,
+                        ),
+                  ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   slide.subtitle ?? '',
                   maxLines: 1,
@@ -724,32 +727,36 @@ class _ProductSlide extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Voir',
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w900,
+                const SizedBox(height: 8),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Voir',
+                        style: TextStyle(
+                          color: AppColors.navy,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: AppColors.sun,
-                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                      const SizedBox(width: 4),
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: AppColors.sun,
+                          borderRadius: BorderRadius.circular(AppRadii.sm),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_forward_rounded,
+                          color: AppColors.navy,
+                          size: 16,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: AppColors.navy,
-                        size: 18,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),

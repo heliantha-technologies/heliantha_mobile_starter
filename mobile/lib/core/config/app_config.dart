@@ -25,10 +25,23 @@ class AppConfig {
   static const _appBaseUrlOverride = String.fromEnvironment('APP_BASE_URL');
   static const _isRelease = bool.fromEnvironment('dart.vm.product');
 
+  static bool get _isLocalWeb {
+    if (!kIsWeb) return false;
+    try {
+      final host = Uri.base.host.toLowerCase();
+      return host.isEmpty ||
+          host == 'localhost' ||
+          host == '127.0.0.1' ||
+          host == '0.0.0.0';
+    } catch (_) {
+      return true;
+    }
+  }
+
   static String get apiBaseUrl {
     return _resolveBaseUrl(
       _apiBaseUrlOverride,
-      defaultValue: kIsWeb ? '' : productionApiBaseUrl,
+      defaultValue: (kIsWeb && !_isLocalWeb) ? '' : productionApiBaseUrl,
     );
   }
 

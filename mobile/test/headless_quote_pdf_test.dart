@@ -42,6 +42,10 @@ void main() {
         'https://app.heliantha.ma/simulation/456/pdf',
       );
     });
+
+    test('apiBaseUrl defaults to productionApiBaseUrl when not overridden', () {
+      expect(AppConfig.apiBaseUrl, AppConfig.productionApiBaseUrl);
+    });
   });
 
   group('QuoteCalculationResult - Extraction Métriques & Résolution PDF', () {
