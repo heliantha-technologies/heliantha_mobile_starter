@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../shared/widgets/brand_widgets.dart';
@@ -181,6 +182,7 @@ class _ChatMessage {
   ChatDevisData? devisData;
   List<AssistantProduct> suggestedProducts = const [];
   bool offerWhatsApp = false;
+  Map<String, dynamic>? actionData;
 
   bool get isUser => role == 'user';
 
@@ -193,6 +195,7 @@ class _ChatMessage {
         if (suggestedProducts.isNotEmpty)
           'suggested_products':
               suggestedProducts.map((p) => p.toJson()).toList(),
+        if (actionData != null) 'action_data': actionData,
       };
 
   static _ChatMessage? fromJson(Map<String, dynamic> json) {
@@ -225,6 +228,12 @@ class _ChatMessage {
         }
       }
       msg.suggestedProducts = list;
+    }
+
+    if (json['action_data'] is Map<String, dynamic>) {
+      msg.actionData = json['action_data'] as Map<String, dynamic>;
+    } else if (json['action'] is Map<String, dynamic>) {
+      msg.actionData = json['action'] as Map<String, dynamic>;
     }
     return msg;
   }
@@ -647,6 +656,7 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
           assistantMessage.text = cleanText;
           assistantMessage.devisData = parsed.devisData;
           assistantMessage.suggestedProducts = reply.suggestedProducts;
+          assistantMessage.actionData = reply.action;
           assistantMessage.offerWhatsApp = reply.offerWhatsApp;
           if (reply.offerWhatsApp) {
             assistantMessage.displayedText = cleanText;
@@ -1179,6 +1189,12 @@ class _ChatMessageTile extends StatelessWidget {
                     AssistantProductsCarousel(
                       products: message.suggestedProducts,
                     ),
+                  if (message.actionData != null &&
+                      !message.isThinking &&
+                      !message.isStreaming) ...[
+                    const SizedBox(height: 12),
+                    _AssistantActionButton(action: message.actionData!),
+                  ],
                   if (message.offerWhatsApp &&
                       !message.isThinking &&
                       !message.isStreaming) ...[
@@ -1190,6 +1206,112 @@ class _ChatMessageTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AssistantActionButton extends StatelessWidget {
+  const _AssistantActionButton({required this.action});
+
+  final Map<String, dynamic> action;
+
+  void _onTap(BuildContext context) {
+    unawaited(HapticFeedback.mediumImpact());
+    final type = action['type']?.toString() ?? '';
+    final category = action['category']?.toString() ?? '';
+
+    // Fermer le bottom sheet pour une navigation fluide vers le wizard
+    Navigator.of(context).pop();
+
+    if (type == 'open_pumping_calculator' || category == 'pumping') {
+      context.push('/quote/form/pompage');
+    } else if (category == 'hybrid' || category == 'batteries') {
+      context.push('/quote/form/hybride');
+    } else {
+      context.push('/quote/form/autoconsommation');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final type = action['type']?.toString() ?? '';
+    final label = action['label']?.toString() ??
+        action['button_text']?.toString() ??
+        'Lancer mon devis sur-mesure';
+
+    final isPumping = type == 'open_pumping_calculator';
+
+    return SizedBox(
+      width: double.infinity,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _onTap(context),
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isPumping
+                    ? [const Color(0xFF0284C7), const Color(0xFF0369A1)]
+                    : [const Color(0xFF0F172A), const Color(0xFF1E293B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isPumping
+                    ? const Color(0xFF38BDF8).withValues(alpha: 0.3)
+                    : const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: (isPumping
+                          ? const Color(0xFF0284C7)
+                          : const Color(0xFF0F172A))
+                      .withValues(alpha: 0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isPumping
+                      ? Icons.water_drop_rounded
+                      : Icons.solar_power_rounded,
+                  color: isPumping
+                      ? const Color(0xFFBAE6FD)
+                      : const Color(0xFFFBBF24),
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -102,6 +102,7 @@ class AssistantReply {
     required this.text,
     this.suggestedProducts = const [],
     this.offerWhatsApp = false,
+    this.action,
   });
 
   static const unavailable = AssistantReply(
@@ -114,6 +115,7 @@ class AssistantReply {
   final String text;
   final List<AssistantProduct> suggestedProducts;
   final bool offerWhatsApp;
+  final Map<String, dynamic>? action;
 
   static List<AssistantProduct> parseProducts(dynamic raw) {
     if (raw is! List) return const [];

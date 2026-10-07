@@ -141,6 +141,10 @@ class AssistantApiService {
             json['content'] ?? json['reply'] ?? json['message'] ?? json['text'];
         final devisMap = json['devis'] ?? json['quote'];
         final offerWhatsApp = json['offer_whatsapp'] == true;
+        final rawAction = json['action'];
+        final actionMap = rawAction is Map<String, dynamic>
+            ? rawAction
+            : (rawAction is Map ? Map<String, dynamic>.from(rawAction) : null);
         if (answer is String && answer.trim().isNotEmpty) {
           var text = answer.trim();
           if (devisMap is Map && !text.contains('<<<DEVIS_DATA:')) {
@@ -150,18 +154,21 @@ class AssistantApiService {
             text: text,
             suggestedProducts: products,
             offerWhatsApp: offerWhatsApp,
+            action: actionMap,
           );
         } else if (devisMap is Map) {
           return AssistantReply(
             text: '<<<DEVIS_DATA: ${jsonEncode(devisMap)}>>>',
             suggestedProducts: products,
             offerWhatsApp: offerWhatsApp,
+            action: actionMap,
           );
         } else if (products.isNotEmpty) {
           return AssistantReply(
             text: 'Voici les produits proposés pour votre demande :',
             suggestedProducts: products,
             offerWhatsApp: offerWhatsApp,
+            action: actionMap,
           );
         }
       }
