@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/router/app_router.dart';
+import 'core/maintenance/maintenance_gate.dart';
+import 'core/maintenance/maintenance_provider.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/catalog/providers/store_context_provider.dart';
+import 'features/home/providers/home_provider.dart';
 import 'features/notifications/services/fcm_service.dart';
 import 'shared/theme/app_theme.dart';
 import 'shared/widgets/app_background.dart';
@@ -45,6 +48,14 @@ class _HelianthaAppState extends ConsumerState<HelianthaApp> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(maintenanceProvider, (previous, next) {
+      if (next == MaintenanceStatus.available && previous != next) {
+        // Reload failed initial reads after reopening; keep local cart and drafts.
+        ref.invalidate(currentUserProvider);
+        ref.invalidate(storeContextProvider);
+        ref.invalidate(homeSlidesProvider);
+      }
+    });
     ref.listen(currentUserProvider, (previous, next) {
       if (next.valueOrNull != null) {
         unawaited(ref.read(fcmServiceProvider).registerForCurrentUser());
@@ -78,8 +89,10 @@ class _HelianthaAppState extends ConsumerState<HelianthaApp> {
           child: MediaQuery(
             data: normalizedMediaQuery,
             child: SizedBox.expand(
-              child: HelianthaBackground(
-                child: child ?? const SizedBox.shrink(),
+              child: MaintenanceGate(
+                child: HelianthaBackground(
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),

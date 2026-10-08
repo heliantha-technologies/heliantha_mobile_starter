@@ -16,6 +16,7 @@ class ApiClient {
             receiveTimeout: const Duration(seconds: 18),
             sendTimeout: const Duration(seconds: 12),
             headers: const {'Accept': 'application/json'},
+            extra: const {'withCredentials': true},
           ),
         ) {
     dio.interceptors.add(

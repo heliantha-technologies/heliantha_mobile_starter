@@ -6,10 +6,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/maintenance/maintenance_provider.dart';
 import 'assistant_reply.dart';
 
 final assistantApiServiceProvider = Provider<AssistantApiService>((ref) {
-  return AssistantApiService();
+  final service = AssistantApiService();
+  service._dio.interceptors.add(MaintenanceInterceptor(
+    () => ref.read(maintenanceProvider.notifier).reportMaintenance(),
+  ));
+  ref.onDispose(() => service._dio.close(force: true));
+  return service;
 });
 
 class AssistantApiService {
@@ -17,6 +23,7 @@ class AssistantApiService {
       : _dio = dio ??
             Dio(
               BaseOptions(
+                extra: const {'withCredentials': true},
                 connectTimeout: const Duration(seconds: 45),
                 receiveTimeout: const Duration(seconds: 60),
                 sendTimeout: const Duration(seconds: 45),

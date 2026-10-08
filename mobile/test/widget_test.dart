@@ -1,25 +1,39 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dio/dio.dart';
 
 import 'package:heliantha_mobile/app.dart';
 import 'package:heliantha_mobile/core/router/app_router.dart';
+import 'package:heliantha_mobile/core/maintenance/maintenance_provider.dart';
 import 'package:heliantha_mobile/features/auth/providers/auth_provider.dart';
 import 'package:heliantha_mobile/features/catalog/providers/store_context_provider.dart';
 
+class _AvailableMaintenance extends MaintenanceRepository {
+  @override
+  Future<bool> check(
+          {bool? previous, required CancelToken cancelToken}) async =>
+      false;
+}
+
 void main() {
-  testWidgets('renders Heliantha app shell without live services', (tester) async {
+  testWidgets('renders Heliantha app shell without live services',
+      (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     appRouter.go('/privacy');
+    final maintenance = _AvailableMaintenance();
+    addTearDown(maintenance.dispose);
 
     try {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            maintenanceRepositoryProvider.overrideWithValue(maintenance),
             currentUserProvider.overrideWith((ref) async => null),
             storeContextProvider.overrideWith(
-              (ref) async => throw StateError('Store context disabled in widget test'),
+              (ref) async =>
+                  throw StateError('Store context disabled in widget test'),
             ),
           ],
           child: const HelianthaApp(),

@@ -5,13 +5,14 @@ import httpx
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from app.core.config import get_settings
 
 router = APIRouter(
     prefix="/v1/devis",
     tags=["Devis & Simulateur Solaire"],
 )
 
-FLASK_INTERNAL_URL = "http://127.0.0.1:8012"
+FLASK_INTERNAL_URL = get_settings().flask_base_url
 PROJECT_TYPE_MAPPING = {
     "autoconsommation": "photovoltaic",
     "on_grid": "photovoltaic",

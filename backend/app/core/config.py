@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     app_name: str = "Heliantha Mobile API"
     app_env: str = "development"
     api_prefix: str = "/v1"
+    flask_internal_url: str = ""  # Local development: 5000; deployed engine: 8012.
+
+    @property
+    def flask_base_url(self) -> str:
+        if self.flask_internal_url.strip():
+            return self.flask_internal_url.strip().rstrip("/")
+        port = 8012 if self.app_env.lower() in {"prod", "production"} else 5000
+        return f"http://127.0.0.1:{port}"
 
 
 
