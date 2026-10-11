@@ -34,7 +34,10 @@ async def status(request: Request, since: bool | None = None, wait: float = Quer
     cookie = request.headers.get("cookie", "")
     try:
         while True:
-            state = await request.app.state.maintenance.status(cookie, fresh=since is None)
+            state = await request.app.state.maintenance.status(
+                cookie, fresh=since is None,
+                max_age=None if since is None else 1.0,
+            )
             if since is None or state["maintenance"] != since or time.monotonic() >= deadline:
                 return JSONResponse(public_payload(state), headers=HEADERS)
             if await request.is_disconnected():

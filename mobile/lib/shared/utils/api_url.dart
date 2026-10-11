@@ -29,7 +29,19 @@ String _normalizeAbsoluteUrl(Uri uri, String original) {
   return original;
 }
 
-String resolvePdfUrl(String? rawUrl) => AppConfig.resolvePdfUrl(rawUrl);
+String resolvePdfUrl(String? rawUrl, {String? accessToken}) {
+  final url = AppConfig.resolvePdfUrl(rawUrl);
+  final token = accessToken?.trim();
+  if (url.isEmpty || token == null || token.isEmpty) return url;
+
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.queryParameters.containsKey('token')) return url;
+
+  // Preserve the engine's query string, including repeated parameters.
+  final query = '${uri.query}${uri.query.isEmpty ? '' : '&'}'
+      'token=${Uri.encodeQueryComponent(token)}';
+  return uri.replace(query: query).toString();
+}
 
 String _rebaseOnConfiguredApi(Uri uri) {
   final baseStr = AppConfig.apiBaseUrl.trim();

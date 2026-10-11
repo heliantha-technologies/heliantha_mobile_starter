@@ -115,10 +115,12 @@ void main() {
       await tester.pump();
       expect(repository.calls, 1);
       expect(
-        tester.widget<InkWell>(find.ancestor(
-          of: find.text('Calcul en cours...'),
-          matching: find.byType(InkWell),
-        )).onTap,
+        tester
+            .widget<InkWell>(find.ancestor(
+              of: find.text('Calcul en cours...'),
+              matching: find.byType(InkWell),
+            ))
+            .onTap,
         isNull,
       );
       expect(repository.submitted?.contact.phone, '+212661575128');
@@ -225,6 +227,7 @@ void main() {
         'total_ttc': 12345.67,
         'power_kwc': 5.85,
         'pdf_url': '/v1/devis/DEV-FR-42/pdf',
+        'access_token': 'form-quote-token',
       }));
       await _pumpUi(tester);
       if (scenario == 'large text') {
@@ -278,7 +281,7 @@ void main() {
         await tester.tap(pdf);
         await _pumpUi(tester);
         expect((launches.last.arguments as Map)['url'],
-            'https://app.heliantha.ma/v1/devis/DEV-FR-42/pdf');
+            'https://app.heliantha.ma/v1/devis/DEV-FR-42/pdf?token=form-quote-token');
       }
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());

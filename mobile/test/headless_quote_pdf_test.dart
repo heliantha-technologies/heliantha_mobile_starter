@@ -24,7 +24,9 @@ void main() {
       expect(resolvePdfUrl(httpsUrl), httpsUrl);
     });
 
-    test('resolvePdfUrl préfixe les URLs relatives avec https://app.heliantha.ma', () {
+    test(
+        'resolvePdfUrl préfixe les URLs relatives avec https://app.heliantha.ma',
+        () {
       expect(
         AppConfig.resolvePdfUrl('/api/devis/pdf/DEV-2026-001'),
         'https://app.heliantha.ma/api/devis/pdf/DEV-2026-001',
@@ -74,7 +76,8 @@ void main() {
       );
     });
 
-    test('Calcule resolvedPdfUrl par défaut avec quoteNumber si pdf_url absent', () {
+    test('Calcule resolvedPdfUrl par défaut avec quoteNumber si pdf_url absent',
+        () {
       final json = {
         'id': 'DEV-AUTO-123',
         'total': '32000',
@@ -96,6 +99,35 @@ void main() {
   });
 
   group('ChatDevisData (Assistant IA) - Résolution PDF Sécurisée', () {
+    test('reconstructed PDF URL retains its access token through chat history',
+        () {
+      final data = ChatDevisData.fromJson({
+        'ref': 'DEV-IA-TOKEN',
+        'total_ttc': 25000,
+        'access_token': 'assistant-quote-token',
+      });
+      final restored = ChatDevisData.fromJson(data.toJson());
+      expect(restored.accessToken, 'assistant-quote-token');
+      expect(
+        Uri.parse(restored.pdfUrl!).queryParameters['token'],
+        'assistant-quote-token',
+      );
+      expect(restored.pdfUrl, data.pdfUrl);
+    });
+
+    test('PDF URL already signed by the engine is not modified', () {
+      final data = ChatDevisData.fromJson({
+        'ref': 'DEV-IA-TOKEN',
+        'total_ttc': 25000,
+        'access_token': 'assistant-quote-token',
+        'pdf_url': '/api/devis/pdf/DEV-IA-TOKEN?token=engine-token',
+      });
+      expect(
+        Uri.parse(data.pdfUrl!).queryParametersAll['token'],
+        ['engine-token'],
+      );
+    });
+
     test('fromJson résout systématiquement pdf_url via resolvePdfUrl', () {
       final devisJson = {
         'ref': 'DEV-IA-888',
@@ -118,7 +150,9 @@ void main() {
       );
     });
 
-    test('fromJson génère et résout une URL PDF par défaut si le champ est absent', () {
+    test(
+        'fromJson génère et résout une URL PDF par défaut si le champ est absent',
+        () {
       final devisJson = {
         'ref': 'DEV-IA-FALLBACK',
         'total': 25000,

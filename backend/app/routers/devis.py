@@ -1,8 +1,9 @@
 import logging
+import re
 from typing import Any, Literal, Optional
 
 import httpx
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.core.config import get_settings
@@ -29,6 +30,7 @@ PROJECT_TYPE_MAPPING = {
     "pumping": "pumping",
 }
 logger = logging.getLogger(__name__)
+PDF_ACCESS_DENIED = "Accès non autorisé à ce devis. Jeton de consultation requis."
 
 
 class ContactInfo(BaseModel):
@@ -383,10 +385,16 @@ async def calculer_devis(
 
 
 @router.get("/{quote_id}/pdf")
-async def telecharger_devis_pdf(quote_id: str) -> Response:
+async def telecharger_devis_pdf(
+    quote_id: str, request: Request, token: str | None = Query(None),
+) -> Response:
     quote_id = quote_id.strip()
-    if not quote_id:
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", quote_id):
         raise HTTPException(status_code=400, detail="Identifiant devis invalide.")
+
+    cookie = request.headers.get("cookie", "")
+    if not token and not cookie:
+        raise HTTPException(status_code=403, detail=PDF_ACCESS_DENIED)
 
     if quote_id.isdigit():
         flask_url = f"{FLASK_INTERNAL_URL}/devis/{quote_id}/document.pdf"
@@ -394,27 +402,44 @@ async def telecharger_devis_pdf(quote_id: str) -> Response:
         flask_url = f"{FLASK_INTERNAL_URL}/simulation/{quote_id}/predevis"
 
     try:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            response = await client.get(flask_url)
-    except Exception as exc:
-        logger.warning("Erreur connexion moteur PDF devis %s : %s", quote_id, exc)
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
+            response = await client.get(
+                flask_url,
+                params={"token": token} if token else None,
+                headers={"Accept": "application/pdf", "Cookie": cookie},
+            )
+    except httpx.HTTPError as exc:
+        # Exception URLs can contain the private consultation token.
+        logger.warning("Erreur connexion moteur PDF devis %s : %s", quote_id, type(exc).__name__)
         raise HTTPException(
             status_code=502,
-            detail=f"Erreur de connexion au moteur de devis: {exc}",
+            detail="Impossible de joindre le moteur de devis.",
         ) from exc
+
+    # Flask alone verifies its signed administrator session and quote token.
+    if response.status_code in (401, 403) or 300 <= response.status_code < 400:
+        raise HTTPException(status_code=403, detail=PDF_ACCESS_DENIED)
 
     if response.status_code == 404:
         raise HTTPException(status_code=404, detail="Devis PDF introuvable.")
 
     if response.status_code != 200:
         raise HTTPException(
-            status_code=response.status_code,
+            status_code=_upstream_status_code(response.status_code),
             detail=f"Erreur moteur PDF: HTTP {response.status_code}",
         )
+
+    content_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if content_type != "application/pdf":
+        raise HTTPException(status_code=502, detail="Le moteur de devis n'a pas renvoyé un PDF valide.")
 
     filename = f"Devis_HeliAntha_{quote_id}.pdf"
     return Response(
         content=response.content,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename={filename}"},
+        headers={
+            "Content-Disposition": f"inline; filename={filename}",
+            "Cache-Control": "private, no-store, max-age=0",
+            "Referrer-Policy": "no-referrer",
+        },
     )

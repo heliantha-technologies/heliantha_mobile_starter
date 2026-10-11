@@ -19,6 +19,7 @@ from app.api.routes import (
 from app.clients.bridge import PrestaShopBridgeClient
 from app.clients.prestashop import PrestaShopClient
 from app.core.config import get_settings
+from app.core.request_policy import HostValidationMiddleware, configured_trusted_hosts, route_path
 from app.routers import devis
 from app.services.maintenance import MaintenanceService, MaintenanceUnavailable
 
@@ -61,7 +62,7 @@ app.state.maintenance = MaintenanceService(settings.flask_base_url)
 
 @app.middleware("http")
 async def enforce_maintenance(request, call_next):
-    path = request.url.path
+    path = route_path(request.scope)
     # Health checks, internal integrations, and the status channel stay available.
     # The middleware never reaches PrestaShop when a client is blocked.
     protected = (path == settings.api_prefix or path.startswith(settings.api_prefix + "/"))
@@ -73,7 +74,9 @@ async def enforce_maintenance(request, call_next):
     }
     if protected and not exempt and request.method != "OPTIONS":
         try:
-            state = await app.state.maintenance.status(request.headers.get("cookie", ""))
+            state = await app.state.maintenance.status(
+                request.headers.get("cookie", ""), fresh=False,
+            )
         except MaintenanceUnavailable:
             return maintenance.unavailable_response()
         if state["maintenance"]:
@@ -97,6 +100,12 @@ app.add_middleware(
         "If-None-Match",
     ],
     expose_headers=["ETag", "Cache-Control", "Content-Length"],
+)
+
+# Validate the raw authority before CORS and maintenance inspect the request.
+app.add_middleware(
+    HostValidationMiddleware,
+    allowed_hosts=configured_trusted_hosts(settings.app_env),
 )
 
 app.include_router(health.router)

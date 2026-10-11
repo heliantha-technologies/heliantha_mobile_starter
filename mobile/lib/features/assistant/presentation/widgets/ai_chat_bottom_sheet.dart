@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../shared/utils/api_url.dart';
 import '../../../../shared/widgets/brand_widgets.dart';
 import '../../data/assistant_api_service.dart';
 import '../../data/assistant_reply.dart';
@@ -25,6 +26,7 @@ class ChatDevisData {
     this.panelCount,
     this.inverter,
     this.pdfUrl,
+    this.accessToken,
     this.raw = const {},
   });
 
@@ -34,6 +36,7 @@ class ChatDevisData {
   final int? panelCount;
   final String? inverter;
   final String? pdfUrl;
+  final String? accessToken;
   final Map<String, dynamic> raw;
 
   Map<String, dynamic> toJson() => {
@@ -43,6 +46,7 @@ class ChatDevisData {
         if (panelCount != null) 'panel_count': panelCount,
         if (inverter != null) 'inverter': inverter,
         if (pdfUrl != null) 'pdf_url': pdfUrl,
+        if (accessToken != null) 'access_token': accessToken,
         if (raw.isNotEmpty) 'raw': raw,
       };
 
@@ -124,10 +128,12 @@ class ChatDevisData {
             json['url'])
         ?.toString();
 
-    final pdf = AppConfig.resolvePdfUrl(
+    final accessToken = json['access_token']?.toString();
+    final pdf = resolvePdfUrl(
       rawPdf != null && rawPdf.trim().isNotEmpty
           ? rawPdf
           : '/api/devis/pdf/${Uri.encodeComponent(ref)}',
+      accessToken: accessToken,
     );
 
     return ChatDevisData(
@@ -137,6 +143,7 @@ class ChatDevisData {
       panelCount: panelCount,
       inverter: inverter,
       pdfUrl: pdf,
+      accessToken: accessToken,
       raw: json,
     );
   }
@@ -177,7 +184,6 @@ class _ChatMessage {
   final DateTime timestamp;
   String displayedText;
   bool isThinking;
-  bool isStreaming = false;
   String thinkingStep;
   ChatDevisData? devisData;
   List<AssistantProduct> suggestedProducts = const [];
@@ -202,9 +208,8 @@ class _ChatMessage {
     final role = json['role']?.toString() ?? 'assistant';
     final text = json['text']?.toString() ?? '';
     if (text.isEmpty && role == 'user') return null;
-    final timestamp =
-        DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
-            DateTime.now();
+    final timestamp = DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
+        DateTime.now();
 
     final msg = _ChatMessage(
       role: role,
@@ -344,7 +349,6 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
   bool _isLoading = false;
 
   Timer? _thinkingTimer;
-  Timer? _streamingTimer;
 
   static const _defaultSuggestions = [
     _ChatSuggestion(
@@ -413,7 +417,6 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
   @override
   void dispose() {
     _thinkingTimer?.cancel();
-    _streamingTimer?.cancel();
     _saveMessagesToCache();
     _textController.dispose();
     _scrollController.dispose();
@@ -475,7 +478,6 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
   Future<void> _clearChatHistory() async {
     HapticFeedback.lightImpact();
     _thinkingTimer?.cancel();
-    _streamingTimer?.cancel();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_chatHistoryKey);
@@ -654,21 +656,15 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
           assistantMessage.isThinking = false;
           assistantMessage.thinkingStep = '';
           assistantMessage.text = cleanText;
+          assistantMessage.displayedText = cleanText;
           assistantMessage.devisData = parsed.devisData;
           assistantMessage.suggestedProducts = reply.suggestedProducts;
           assistantMessage.actionData = reply.action;
           assistantMessage.offerWhatsApp = reply.offerWhatsApp;
-          if (reply.offerWhatsApp) {
-            assistantMessage.displayedText = cleanText;
-            _isLoading = false;
-          }
+          _isLoading = false;
         });
-        if (reply.offerWhatsApp) {
-          _saveMessagesToCache();
-          _scrollToBottom(settlePasses: 3);
-        } else {
-          _streamResponse(assistantMessage, cleanText);
-        }
+        _saveMessagesToCache();
+        _scrollToBottom(settlePasses: 3);
       }
     } catch (_) {
       _thinkingTimer?.cancel();
@@ -685,48 +681,6 @@ class _AiChatBottomSheetState extends ConsumerState<AiChatBottomSheet> {
         _scrollToBottom(settlePasses: 3);
       }
     }
-  }
-
-  /// Animation de frappe fluide (Typewriter) pour un affichage dynamique et apaisé
-  void _streamResponse(_ChatMessage message, String fullText) {
-    _streamingTimer?.cancel();
-    int charIndex = 0;
-    int tickCount = 0;
-    final total = fullText.length;
-    final step = total == 0 ? 1 : (total / 60).clamp(2, 3).round();
-
-    setState(() {
-      message.isStreaming = true;
-    });
-
-    _streamingTimer = Timer.periodic(const Duration(milliseconds: 45), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      final shouldFollow = _scrollController.hasClients &&
-          _scrollController.position.maxScrollExtent -
-                  _scrollController.offset <
-              48;
-      tickCount++;
-      charIndex = (charIndex + step).clamp(0, total);
-      setState(() {
-        message.displayedText = fullText.substring(0, charIndex);
-        if (charIndex >= total) {
-          message.displayedText = fullText;
-          message.isStreaming = false;
-          _isLoading = false;
-          timer.cancel();
-          _saveMessagesToCache();
-        }
-      });
-      if (shouldFollow && tickCount % 4 == 0) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || !_scrollController.hasClients) return;
-          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-        });
-      }
-    });
   }
 
   @override
@@ -1156,7 +1110,7 @@ class _ChatMessageTile extends StatelessWidget {
                   if (message.isThinking)
                     _ThinkingIndicator(step: message.thinkingStep),
 
-                  // 2. Texte de réponse de l'IA (avec curseur animé pendant le streaming)
+                  // 2. Réponse complète dès sa réception
                   if (message.displayedText.isNotEmpty)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -1172,32 +1126,26 @@ class _ChatMessageTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (message.isStreaming) const _BlinkingCursor(),
                       ],
                     ),
 
-                  // 3. Carte de Devis interactif officiel (si présent et après la frappe du texte)
-                  if (message.devisData != null && !message.isStreaming) ...[
+                  // 3. Carte de devis interactif officiel
+                  if (message.devisData != null) ...[
                     const SizedBox(height: 14),
                     _ChatMessageQuoteCard(
                       devis: message.devisData!,
                     ),
                   ],
                   if (!message.isThinking &&
-                      !message.isStreaming &&
                       message.suggestedProducts.isNotEmpty)
                     AssistantProductsCarousel(
                       products: message.suggestedProducts,
                     ),
-                  if (message.actionData != null &&
-                      !message.isThinking &&
-                      !message.isStreaming) ...[
+                  if (message.actionData != null && !message.isThinking) ...[
                     const SizedBox(height: 12),
                     _AssistantActionButton(action: message.actionData!),
                   ],
-                  if (message.offerWhatsApp &&
-                      !message.isThinking &&
-                      !message.isStreaming) ...[
+                  if (message.offerWhatsApp && !message.isThinking) ...[
                     const SizedBox(height: 12),
                     const _AssistantWhatsAppButton(),
                   ],
@@ -1724,42 +1672,6 @@ class _AiChatSendButtonState extends State<_AiChatSendButton>
   }
 }
 
-/// Indicateur de frappe : mini-soleil HeliAntha qui tourne pendant l'écriture
-class _BlinkingCursor extends StatefulWidget {
-  const _BlinkingCursor();
-
-  @override
-  State<_BlinkingCursor> createState() => _BlinkingCursorState();
-}
-
-class _BlinkingCursorState extends State<_BlinkingCursor>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 1),
-      child: _MiniOrbitalSun(controller: _controller, size: 18),
-    );
-  }
-}
-
 /// Carte interactive de résultat de devis officiel intégrée dans le chat
 class _ChatMessageQuoteCard extends StatefulWidget {
   const _ChatMessageQuoteCard({required this.devis});
@@ -1819,10 +1731,11 @@ class _ChatMessageQuoteCardState extends State<_ChatMessageQuoteCard>
 
   Future<void> _handleDownload(BuildContext context) async {
     final pdfUrl = widget.devis.pdfUrl;
-    final targetUrl = AppConfig.resolvePdfUrl(
+    final targetUrl = resolvePdfUrl(
       pdfUrl != null && pdfUrl.isNotEmpty
           ? pdfUrl
           : '/api/devis/pdf/${Uri.encodeComponent(widget.devis.reference)}',
+      accessToken: widget.devis.accessToken,
     );
 
     if (targetUrl.isEmpty) {

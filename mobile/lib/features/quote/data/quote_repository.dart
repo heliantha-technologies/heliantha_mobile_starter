@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:open_filex/open_filex.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/config/app_config.dart';
+import '../../../shared/utils/api_url.dart';
 import '../../../shared/utils/friendly_errors.dart';
 
 class QuoteRepository {
@@ -42,13 +42,21 @@ class QuoteRepository {
     }
   }
 
-  Future<String?> downloadAndOpenPdf(String quoteIdentifier) async {
+  Future<String?> downloadAndOpenPdf(
+    String quoteIdentifier, {
+    String? accessToken,
+  }) async {
     try {
       final safeIdentifier = Uri.encodeComponent(quoteIdentifier.trim());
+      final token = accessToken?.trim();
+      final queryParameters = token == null || token.isEmpty
+          ? null
+          : <String, dynamic>{'token': token};
       Response<Object> response;
       try {
         response = await _api.dio.get<Object>(
           '/v1/devis/$safeIdentifier/pdf',
+          queryParameters: queryParameters,
           options: _extendedTimeoutOptions(
             responseType: ResponseType.bytes,
             headers: {'Accept': 'application/pdf'},
@@ -58,6 +66,7 @@ class QuoteRepository {
         if (e.response?.statusCode == 404) {
           response = await _api.dio.get<Object>(
             '/api/devis/pdf/$safeIdentifier',
+            queryParameters: queryParameters,
             options: _extendedTimeoutOptions(
               responseType: ResponseType.bytes,
               headers: {'Accept': 'application/pdf'},
@@ -219,15 +228,18 @@ class QuoteCalculationResult {
         'url',
       ]);
 
+  String? get accessToken => _stringValue(['access_token']);
+
   String get resolvedPdfUrl {
     final raw = pdfUrl;
     if (raw != null && raw.trim().isNotEmpty) {
-      return AppConfig.resolvePdfUrl(raw);
+      return resolvePdfUrl(raw, accessToken: accessToken);
     }
     final num = quoteNumber;
     if (num != null && num.trim().isNotEmpty) {
-      return AppConfig.resolvePdfUrl(
+      return resolvePdfUrl(
         '/v1/devis/${Uri.encodeComponent(num.trim())}/pdf',
+        accessToken: accessToken,
       );
     }
     return '';

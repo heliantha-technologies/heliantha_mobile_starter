@@ -55,7 +55,7 @@ void main() {
     // 4. En cours de réflexion, le soleil orbital est affiché sur le bouton
     expect(find.byKey(const ValueKey('spinning_sun_send')), findsOneWidget);
 
-    // 5. Finalisation du streaming
+    // 5. Réponse complète dès sa réception
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pumpAndSettle();
 

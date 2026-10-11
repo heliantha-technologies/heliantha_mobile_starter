@@ -47,6 +47,9 @@ class SingleFlight:
         except BaseException as exc:
             if not future.done():
                 future.set_exception(exc)
+                # The leader also raises directly; with no followers this
+                # future would otherwise report an unobserved exception.
+                future.exception()
             raise
         finally:
             async with lock:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -88,6 +89,27 @@ async def test_single_flight_cleans_up_and_propagates_error():
 
     res = await sf.execute("fail-key", ok_work)
     assert res == "recovered"
+
+
+async def test_single_flight_failure_without_followers_does_not_log_orphan_error():
+    sf = SingleFlight()
+    loop = asyncio.get_running_loop()
+    original_handler = loop.get_exception_handler()
+    errors = []
+    loop.set_exception_handler(lambda loop, context: errors.append(context))
+
+    async def failing_work():
+        raise ValueError("single caller failure")
+
+    try:
+        with pytest.raises(ValueError, match="single caller failure"):
+            await sf.execute("alone", failing_work)
+        gc.collect()
+        await asyncio.sleep(0)
+        assert errors == []
+        assert sf._in_flight == {}
+    finally:
+        loop.set_exception_handler(original_handler)
 
 
 # ==============================================================================

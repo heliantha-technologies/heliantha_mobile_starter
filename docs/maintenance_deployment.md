@@ -62,10 +62,37 @@ que FastAPI ne joint pas le statut Flask : vérifier `FLASK_INTERNAL_URL`.
 
 Ouvrir le site dans une fenêtre privée, puis activer le mode depuis une autre
 fenêtre admin. La page déjà ouverte bascule normalement en environ une seconde
-plus le réseau. Les nouvelles opérations sont bloquées immédiatement côté serveur.
+plus le réseau. Les contrôles métier utilisent un cache public de 15 secondes
+par processus FastAPI ; sans lecteur du canal de statut, une bascule peut donc
+prendre jusqu’à 15 secondes avant de bloquer une nouvelle opération. Le canal
+de suivi rafraîchit ce même état au plus toutes les secondes. Une exemption
+administrateur est toujours vérifiée auprès de Flask et n’est jamais mise en cache.
 Une requête déjà en cours avant activation n’est pas interrompue ni rejouée.
 À la désactivation, le site se réouvre automatiquement sans perdre les données
-locales. Une panne réseau ne peut jamais annuler une maintenance déjà connue.
+locales. En cas de panne Flask, FastAPI conserve le dernier état public vérifié,
+actif ou inactif ; sans état initial connu, il répond HTTP 503. Une ancienne
+exemption administrateur ne peut jamais servir de valeur de secours.
+
+## Hôtes autorisés
+
+FastAPI rejette les en-têtes Host absents, multiples, malformés et les hôtes
+inconnus avec HTTP 400, avant le contrôle de maintenance. Les valeurs par défaut
+sont `localhost`, `127.0.0.1`, `::1`, `heliantha.ma`, `www.heliantha.ma`,
+`app.heliantha.ma` et `api.heliantha.ma`. `testserver` est ajouté uniquement
+en environnement `development`.
+
+Pour un autre domaine ou une adresse IP du réseau local, définir `TRUSTED_HOSTS`
+dans l’environnement du processus qui lance FastAPI. Cette liste remplace les
+valeurs par défaut ; les jokers sont refusés. Aucun nouveau champ n’a été ajouté
+à la configuration JWT ni aux fichiers `.env`.
+
+```powershell
+$env:TRUSTED_HOSTS = 'localhost,127.0.0.1,app.heliantha.ma,api.heliantha.ma'
+```
+
+Le reverse proxy doit transmettre un Host présent dans cette liste. Le filtre
+de maintenance lit le chemin ASGI et gère aussi les applications montées sous
+un `root_path`, indépendamment de cet en-tête.
 
 Les fichiers locaux ne mettent pas à jour le serveur à eux seuls. Le déploiement
 des trois services est nécessaire ; aucune modification distante n’est réalisée

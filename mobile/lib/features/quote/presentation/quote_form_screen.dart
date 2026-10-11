@@ -1031,6 +1031,9 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
       return;
     }
 
+    final accessToken = Uri.tryParse(resolvedUrl)?.queryParameters['token'] ??
+        _result?.accessToken;
+
     setState(() => _downloadingPdf = true);
     try {
       final uri = Uri.parse(resolvedUrl);
@@ -1042,7 +1045,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         if (quoteNumber != null && quoteNumber.isNotEmpty) {
           await ref
               .read(quoteRepositoryProvider)
-              .downloadAndOpenPdf(quoteNumber);
+              .downloadAndOpenPdf(quoteNumber, accessToken: accessToken);
         } else {
           throw const QuoteApiException('Impossible d\'ouvrir le devis PDF.');
         }
@@ -1059,7 +1062,7 @@ class _QuoteFormScreenState extends ConsumerState<QuoteFormScreen> {
         if (quoteNumber != null && quoteNumber.isNotEmpty) {
           await ref
               .read(quoteRepositoryProvider)
-              .downloadAndOpenPdf(quoteNumber);
+              .downloadAndOpenPdf(quoteNumber, accessToken: accessToken);
           if (mounted) {
             AppFeedback.success(context, 'PDF enregistré.');
           }
