@@ -52,7 +52,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String _title = 'M.';
   bool _terms = false;
   bool _loginLoading = false;
-  bool _confirming = false;
   bool _orderConfirmed = false;
   bool _successHandled = false;
   bool _successNavigationDone = false;
@@ -63,12 +62,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   int? _checkoutCurrencyId;
   int? _checkoutLanguageId;
   int _previewRequestId = 0;
-  late final String _idempotencyKey;
 
   @override
   void initState() {
     super.initState();
-    _idempotencyKey = DateTime.now().microsecondsSinceEpoch.toString();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(currentUserProvider).valueOrNull;
       if (user != null) {
@@ -281,7 +278,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     required bool isConnected,
     required AddressModel? userAddress,
   }) async {
-    if (_confirming || _orderConfirmed || _previewUpdating) {
+    final submission = ref.read(checkoutSubmissionProvider);
+    if (submission.isRestoring ||
+        !submission.canSubmit ||
+        submission.isSubmitting ||
+        _orderConfirmed ||
+        _previewUpdating) {
       return;
     }
     final sync = ref.read(cartSyncStateProvider);
@@ -324,17 +326,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       }
     }
 
-    setState(() {
-      _confirming = true;
-      _message = null;
-    });
+    setState(() => _message = null);
 
     try {
       final effectiveMode = isConnected ? 'login' : _mode;
-      final result = await ref.read(checkoutRepositoryProvider).confirm(
+      final result = await ref.read(checkoutSubmissionProvider.notifier).submit(
             lines: CheckoutLineRequest.fromCart(ref.read(cartProvider)),
             mode: effectiveMode,
-            idempotencyKey: _idempotencyKey,
             currencyId: _checkoutCurrencyId,
             languageId: _checkoutLanguageId,
             guest: !isConnected && effectiveMode == 'guest'
@@ -360,10 +358,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             paymentModule: paymentModule,
           );
       if (!mounted) return;
-      setState(() {
-        _orderConfirmed = true;
-        _confirming = false;
-      });
+      setState(() => _orderConfirmed = true);
       _handleSuccessfulOrder(
         result,
         preview,
@@ -375,10 +370,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       setState(
         () => _message = friendlyCheckoutMessage(error),
       );
-    } finally {
-      if (mounted && !_orderConfirmed) {
-        setState(() => _confirming = false);
-      }
     }
   }
 
@@ -392,7 +383,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
     _successHandled = true;
-    ref.read(cartProvider.notifier).clear();
     await _showOrderSuccessDialog(
       result,
       preview,
@@ -449,6 +439,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cartItems = ref.watch(cartProvider);
+    final submission = ref.watch(checkoutSubmissionProvider);
     final authState = ref.watch(currentUserProvider);
     final user = authState.valueOrNull;
     final isConnected = user != null;
@@ -460,7 +451,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     ref.listen<int?>(selectedCurrencyIdProvider, (previous, next) {
       if (previous != next &&
           _previewFuture != null &&
-          !_confirming &&
+          !ref.read(checkoutSubmissionProvider).isSubmitting &&
           !_orderConfirmed) {
         _loadPreview(
           carrierId: _selectedCarrierId,
@@ -483,10 +474,24 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       }
     });
 
-    return Scaffold(
-      appBar: const AppTopBar(
+    return PopScope<Object?>(
+      canPop: !submission.isSubmitting,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && submission.isSubmitting && mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text('Commande en cours. Veuillez patienter.'),
+              ),
+            );
+        }
+      },
+      child: Scaffold(
+      appBar: AppTopBar(
         subtitle: 'Checkout',
         showBack: true,
+        backEnabled: !submission.isSubmitting,
         backFallbackLocation: '/cart',
       ),
       body: SafeArea(
@@ -634,7 +639,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               SizedBox(
                                 width: double.infinity,
                                 child: FilledButton.icon(
-                                  onPressed: _confirming ||
+                                  onPressed: submission.isRestoring ||
+                                          submission.isSubmitting ||
+                                          !submission.canSubmit ||
                                           _orderConfirmed ||
                                           _previewUpdating
                                       ? null
@@ -643,7 +650,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                             isConnected: isConnected,
                                             userAddress: userAddress,
                                           ),
-                                  icon: _confirming
+                                  icon: submission.isSubmitting
                                       ? const SizedBox.square(
                                           dimension: 18,
                                           child: CircularProgressIndicator(
@@ -652,7 +659,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                         )
                                       : const Icon(Icons.check_circle_rounded),
                                   label: Text(
-                                    _confirming
+                                    submission.isRestoring
+                                        ? 'Préparation du checkout...'
+                                        : submission.isSubmitting
                                         ? 'Confirmation en cours...'
                                         : _orderConfirmed
                                             ? 'Commande confirmée'
@@ -670,6 +679,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   );
                 },
               ),
+      ),
       ),
     );
   }

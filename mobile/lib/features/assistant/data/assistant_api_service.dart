@@ -106,9 +106,10 @@ class AssistantApiService {
     try {
       String currency = 'MAD';
       try {
-        final selected = _currencyResolver == null
+        final currencyResolver = _currencyResolver;
+        final selected = currencyResolver == null
             ? null
-            : await _currencyResolver!().timeout(const Duration(seconds: 3));
+            : await currencyResolver().timeout(const Duration(seconds: 3));
         final normalized = selected?.trim().toUpperCase();
         if (normalized != null && RegExp(r'^[A-Z]{3}$').hasMatch(normalized)) {
           currency = normalized;
