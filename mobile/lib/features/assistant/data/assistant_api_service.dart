@@ -7,10 +7,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/maintenance/maintenance_provider.dart';
+import '../../catalog/providers/store_context_provider.dart';
 import 'assistant_reply.dart';
 
 final assistantApiServiceProvider = Provider<AssistantApiService>((ref) {
-  final service = AssistantApiService();
+  final service = AssistantApiService(currencyResolver: () async {
+    await ref.read(selectedCurrencyIdProvider.notifier).ready;
+    final context = await ref.read(storeContextProvider.future);
+    final selectedId = context.effectiveCurrencyId(
+      ref.read(selectedCurrencyIdProvider),
+    );
+    final selected = context.currencies.where((item) => item.id == selectedId);
+    return selected.isEmpty ? 'MAD' : selected.first.isoCode;
+  });
   service._dio.interceptors.add(MaintenanceInterceptor(
     () => ref.read(maintenanceProvider.notifier).reportMaintenance(),
   ));
@@ -19,7 +28,7 @@ final assistantApiServiceProvider = Provider<AssistantApiService>((ref) {
 });
 
 class AssistantApiService {
-  AssistantApiService({Dio? dio})
+  AssistantApiService({Dio? dio, Future<String> Function()? currencyResolver})
       : _dio = dio ??
             Dio(
               BaseOptions(
@@ -32,9 +41,11 @@ class AssistantApiService {
                   'Accept': 'application/json',
                 },
               ),
-            );
+            ),
+        _currencyResolver = currencyResolver;
 
   final Dio _dio;
+  final Future<String> Function()? _currencyResolver;
 
   static const _quotaReply = AssistantReply(
     text:
@@ -93,7 +104,22 @@ class AssistantApiService {
     }
 
     try {
-      final payload = jsonEncode({'messages': formattedMessages});
+      String currency = 'MAD';
+      try {
+        final selected = _currencyResolver == null
+            ? null
+            : await _currencyResolver!().timeout(const Duration(seconds: 3));
+        final normalized = selected?.trim().toUpperCase();
+        if (normalized != null && RegExp(r'^[A-Z]{3}$').hasMatch(normalized)) {
+          currency = normalized;
+        }
+      } catch (_) {
+        // The assistant remains usable if the store context is unavailable.
+      }
+      final payload = jsonEncode({
+        'messages': formattedMessages,
+        'currency': currency,
+      });
 
       final response = await _dio.post<dynamic>(
         endpoint,
