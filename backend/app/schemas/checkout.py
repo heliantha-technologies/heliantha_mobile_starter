@@ -104,5 +104,6 @@ class CheckoutPreviewOut(BaseModel):
     payments: list[CheckoutPaymentOut]
     selected_carrier_id: int | None = None
     stock_ok: bool
+    message: str | None = None
     write_enabled: bool
     bridge_required: list[str]

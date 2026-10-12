@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:file_saver/file_saver.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +17,7 @@ import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
 import '../../addresses/providers/addresses_provider.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../cart/domain/cart_item.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../../catalog/providers/store_context_provider.dart';
 import '../../notifications/services/fcm_service.dart';
@@ -40,6 +44,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _phone = TextEditingController();
 
   Future<CheckoutPreview>? _previewFuture;
+  CheckoutPreview? _lastPreview;
+  CancelToken? _previewCancelToken;
+  Timer? _previewDebounceTimer;
+  bool _previewUpdating = false;
   String _mode = 'guest';
   String _title = 'M.';
   bool _terms = false;
@@ -76,6 +84,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   @override
   void dispose() {
+    _previewDebounceTimer?.cancel();
+    _previewCancelToken?.cancel('Checkout closed');
     _firstname.dispose();
     _lastname.dispose();
     _email.dispose();
@@ -86,9 +96,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     super.dispose();
   }
 
-  void _loadPreview(
-      {int? carrierId, int? addressId, bool keepCarrier = false}) {
+  void _loadPreview({
+    int? carrierId,
+    int? addressId,
+    bool keepCarrier = false,
+    bool debounce = false,
+  }) {
     if (!mounted) return;
+    final requestId = ++_previewRequestId;
+    _previewCancelToken?.cancel('Superseded by a newer checkout preview');
+    _previewCancelToken = null;
+    _previewDebounceTimer?.cancel();
     setState(() {
       if (!keepCarrier) {
         _selectedCarrierId = carrierId;
@@ -97,68 +115,106 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         _activeAddressId = addressId;
       }
       _selectedPaymentModule = null;
-      _previewFuture = _requestPreview(
-        carrierId: carrierId,
-        addressId: addressId ?? _activeAddressId,
-      );
+      _previewUpdating = true;
     });
+
+    void startPreview() {
+      if (!mounted || requestId != _previewRequestId) return;
+      setState(() {
+        _previewFuture = _requestPreview(
+          requestId: requestId,
+          carrierId: carrierId,
+          addressId: addressId ?? _activeAddressId,
+        );
+      });
+    }
+
+    if (debounce) {
+      _previewDebounceTimer = Timer(
+        const Duration(milliseconds: 280),
+        startPreview,
+      );
+    } else {
+      startPreview();
+    }
   }
 
-  Future<CheckoutPreview> _requestPreview(
-      {int? carrierId, int? addressId}) async {
-    final requestId = ++_previewRequestId;
-    final cart = ref.read(cartProvider.notifier);
-    final currencySelection = ref.read(selectedCurrencyIdProvider.notifier);
-    final languageSelection = ref.read(selectedLanguageIdProvider.notifier);
-    final contextFuture = ref.read(storeContextProvider.future);
-    await Future.wait(
-        [cart.ready, currencySelection.ready, languageSelection.ready]);
-    final store = await contextFuture;
-    if (!mounted) throw StateError('Checkout closed');
-    final items = ref.read(cartProvider);
-    final selectedCurrencyId = ref.read(selectedCurrencyIdProvider);
-    final cartCode = items.firstOrNull?.product.currency;
-    final savedCurrencyId = cart.currencyId ??
-        store.currencies
-            .where((currency) => currency.isoCode == cartCode)
-            .firstOrNull
-            ?.id;
-    final currencyId =
-        store.effectiveCurrencyId(selectedCurrencyId ?? savedCurrencyId);
-    final languageId =
-        store.effectiveLanguageId(ref.read(selectedLanguageIdProvider));
-    await cart.refreshCurrency(currencyId, force: true);
-    if (!mounted) throw StateError('Checkout closed');
-    final preview = await ref.read(checkoutRepositoryProvider).preview(
-          lines: CheckoutLineRequest.fromCart(ref.read(cartProvider)),
-          currencyId: currencyId,
-          languageId: languageId,
-          carrierId: carrierId,
-          addressId: addressId,
+  Future<CheckoutPreview> _requestPreview({
+    required int requestId,
+    int? carrierId,
+    int? addressId,
+  }) async {
+    final cancelToken = CancelToken();
+    _previewCancelToken = cancelToken;
+    try {
+      final cart = ref.read(cartProvider.notifier);
+      final currencySelection = ref.read(selectedCurrencyIdProvider.notifier);
+      final languageSelection = ref.read(selectedLanguageIdProvider.notifier);
+      final contextFuture = ref.read(storeContextProvider.future);
+      await Future.wait(
+          [cart.ready, currencySelection.ready, languageSelection.ready]);
+      final store = await contextFuture;
+      if (!mounted) throw StateError('Checkout closed');
+      final items = ref.read(cartProvider);
+      final selectedCurrencyId = ref.read(selectedCurrencyIdProvider);
+      final cartCode = items.firstOrNull?.product.currency;
+      final savedCurrencyId = cart.currencyId ??
+          store.currencies
+              .where((currency) => currency.isoCode == cartCode)
+              .firstOrNull
+              ?.id;
+      final currencyId =
+          store.effectiveCurrencyId(selectedCurrencyId ?? savedCurrencyId);
+      final languageId =
+          store.effectiveLanguageId(ref.read(selectedLanguageIdProvider));
+      if (cancelToken.isCancelled || requestId != _previewRequestId) {
+        throw DioException(
+          requestOptions: RequestOptions(path: '/v1/checkout/preview'),
+          type: DioExceptionType.cancel,
         );
-    final expectedCurrency = store.currencies
-        .where((currency) => currency.id == currencyId)
-        .firstOrNull;
-    if (expectedCurrency != null &&
-        preview.totals.currency != expectedCurrency.isoCode) {
-      throw StateError('Unexpected checkout currency');
+      }
+      // The preview accepts product IDs and quantities. The server loads
+      // current prices and stock in one grouped operation; do not issue one
+      // forced product request per cart line here.
+      final preview = await ref.read(checkoutRepositoryProvider).preview(
+            lines: CheckoutLineRequest.fromCart(ref.read(cartProvider)),
+            currencyId: currencyId,
+            languageId: languageId,
+            carrierId: carrierId,
+            addressId: addressId,
+            cancelToken: cancelToken,
+          );
+      final expectedCurrency = store.currencies
+          .where((currency) => currency.id == currencyId)
+          .firstOrNull;
+      if (expectedCurrency != null &&
+          preview.totals.currency != expectedCurrency.isoCode) {
+        throw StateError('Unexpected checkout currency');
+      }
+      if (requestId == _previewRequestId && mounted) {
+        _checkoutCurrencyId = currencyId;
+        _checkoutLanguageId = languageId;
+        _lastPreview = preview;
+        _previewUpdating = false;
+        _previewCancelToken = null;
+      }
+      return preview;
+    } catch (error) {
+      if (requestId == _previewRequestId && mounted) {
+        _previewUpdating = false;
+        _previewCancelToken = null;
+      }
+      rethrow;
     }
-    if (requestId == _previewRequestId) {
-      _checkoutCurrencyId = currencyId;
-      _checkoutLanguageId = languageId;
-    }
-    return preview;
   }
 
   void _recalculateForCarrier(int carrierId) {
-    setState(() {
-      _selectedCarrierId = carrierId;
-      _message = null;
-      _previewFuture = _requestPreview(
-        carrierId: carrierId,
-        addressId: _activeAddressId,
-      );
-    });
+    _message = null;
+    _loadPreview(
+      carrierId: carrierId,
+      addressId: _activeAddressId,
+      debounce: true,
+    );
   }
 
   void _ensureCheckoutSelections(CheckoutPreview preview) {
@@ -225,7 +281,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     required bool isConnected,
     required AddressModel? userAddress,
   }) async {
-    if (_confirming || _orderConfirmed) {
+    if (_confirming || _orderConfirmed || _previewUpdating) {
       return;
     }
     final sync = ref.read(cartSyncStateProvider);
@@ -410,6 +466,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           carrierId: _selectedCarrierId,
           addressId: _activeAddressId,
           keepCarrier: true,
+          debounce: true,
         );
       }
     });
@@ -421,6 +478,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           carrierId: _selectedCarrierId,
           addressId: address.id,
           keepCarrier: true,
+          debounce: true,
         );
       }
     });
@@ -449,10 +507,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             : FutureBuilder<CheckoutPreview>(
                 future: _previewFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
+                  final preview = snapshot.data ?? _lastPreview;
+                  if (snapshot.connectionState != ConnectionState.done &&
+                      preview == null) {
                     return const _CheckoutPreviewSkeleton();
                   }
-                  if (snapshot.hasError || !snapshot.hasData) {
+                  if (snapshot.hasError && !_previewUpdating) {
                     final friendly = friendlyLoadError(snapshot.error);
                     return ResponsivePagePadding(
                       child: AppStatusPanel(
@@ -469,7 +529,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     );
                   }
 
-                  final preview = snapshot.data!;
+                  if (preview == null) {
+                    return const _CheckoutPreviewSkeleton();
+                  }
                   _ensureCheckoutSelections(preview);
                   return ListView(
                     padding: EdgeInsets.zero,
@@ -543,7 +605,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                 ),
                               ),
                               const SizedBox(height: 14),
-                              _CheckoutSummary(preview: preview),
+                              _CheckoutSummary(
+                                preview: preview,
+                                isRefreshing: _previewUpdating,
+                                cartItems: cartItems,
+                              ),
                               const SizedBox(height: 14),
                               Material(
                                 color: Colors.transparent,
@@ -568,7 +634,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               SizedBox(
                                 width: double.infinity,
                                 child: FilledButton.icon(
-                                  onPressed: _confirming || _orderConfirmed
+                                  onPressed: _confirming ||
+                                          _orderConfirmed ||
+                                          _previewUpdating
                                       ? null
                                       : () => _confirm(
                                             preview,
@@ -1172,9 +1240,20 @@ class _SuccessMetaRow extends StatelessWidget {
 }
 
 class _CheckoutSummary extends StatelessWidget {
-  const _CheckoutSummary({required this.preview});
+  const _CheckoutSummary({
+    required this.preview,
+    required this.cartItems,
+    this.isRefreshing = false,
+  });
 
   final CheckoutPreview preview;
+  final List<CartItem> cartItems;
+  final bool isRefreshing;
+
+  bool _priceChanged(CartItem? item, CheckoutLine line) =>
+      item != null &&
+      item.product.currency == line.currency &&
+      (item.product.price - line.unitPrice).abs() >= 0.005;
 
   @override
   Widget build(BuildContext context) {
@@ -1183,7 +1262,29 @@ class _CheckoutSummary extends StatelessWidget {
       title: 'Récapitulatif',
       child: Column(
         children: [
-          for (final line in preview.lines) _LineStatus(line: line),
+          for (final line in preview.lines)
+            _LineStatus(
+              line: line,
+              priceChanged: _priceChanged(
+                cartItems
+                    .where((item) => item.product.id == line.productId)
+                    .firstOrNull,
+                line,
+              ),
+            ),
+          if (preview.message != null) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                preview.message!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+          ],
           const Divider(height: 24),
           _SummaryRow(
             label: 'Sous-total',
@@ -1203,9 +1304,12 @@ class _CheckoutSummary extends StatelessWidget {
           const Divider(height: 24),
           _SummaryRow(
             label: 'Total TTC',
-            value: formatMoney(totals.totalTtc,
-                currency: totals.currency, symbol: totals.currencySymbol),
+            value: preview.stockOk
+                ? formatMoney(totals.totalTtc,
+                    currency: totals.currency, symbol: totals.currencySymbol)
+                : 'À recalculer',
             strong: true,
+            isLoading: isRefreshing,
           ),
           const SizedBox(height: 6),
           Align(
@@ -1225,9 +1329,10 @@ class _CheckoutSummary extends StatelessWidget {
 }
 
 class _LineStatus extends StatelessWidget {
-  const _LineStatus({required this.line});
+  const _LineStatus({required this.line, this.priceChanged = false});
 
   final CheckoutLine line;
+  final bool priceChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1241,7 +1346,11 @@ class _LineStatus extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Text('Quantité ${line.quantity}'),
+        subtitle: Text(line.available
+            ? priceChanged
+                ? 'Prix actualisé · ${formatMoney(line.total, currency: line.currency, symbol: line.currencySymbol)}'
+                : 'Quantité ${line.quantity} · ${formatMoney(line.total, currency: line.currency, symbol: line.currencySymbol)}'
+            : line.stockMessage ?? 'Produit indisponible'),
         trailing: Icon(
           line.available ? Icons.check_circle_rounded : Icons.error_rounded,
           color: line.available ? AppColors.leaf : AppColors.danger,
@@ -1365,11 +1474,13 @@ class _SummaryRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.strong = false,
+    this.isLoading = false,
   });
 
   final String label;
   final String value;
   final bool strong;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -1384,12 +1495,24 @@ class _SummaryRow extends StatelessWidget {
                 ),
           ),
         ),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: strong ? AppColors.blue : AppColors.ink,
-                fontWeight: FontWeight.w900,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoading) ...[
+              const SizedBox.square(
+                dimension: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              value,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: strong ? AppColors.blue : AppColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+          ],
         ),
       ],
     );

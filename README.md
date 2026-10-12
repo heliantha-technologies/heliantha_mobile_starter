@@ -90,8 +90,12 @@ JWT_SECRET=CHANGE_ME_WITH_A_LONG_RANDOM_SECRET
 Puis :
 
 ```powershell
+$env:CHECKOUT_WRITE_ENABLED='false'
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8011
 ```
+
+Ce réglage vaut seulement dans ce terminal local et empêche la création de
+commandes pendant les essais.
 
 Ouvrir :
 
@@ -99,11 +103,29 @@ Ouvrir :
 http://127.0.0.1:8011/docs
 ```
 
-Pour le module Devis, le moteur Flask doit aussi tourner en local sur :
+Pour les devis et le statut de maintenance, le moteur Flask doit aussi tourner.
+Dans un terminal PowerShell séparé :
+
+```powershell
+cd "C:\Users\hp\Desktop\HELIANTHA SOLAIRE"
+& "C:\Program Files\Python311\python.exe" run.py
+```
+
+Ce Python contient déjà Flask sur ce PC. L'appeler directement évite d'utiliser
+le `.venv` de FastAPI, qui ne contient pas Flask. Garder les services dans des
+terminaux séparés et ouverts.
+
+Avec `run.py`, son adresse locale est :
 
 ```text
-http://127.0.0.1:8012
+http://127.0.0.1:5000
 ```
+
+FastAPI utilise ce port par défaut en développement. Si Flask écoute sur une
+autre adresse, définir `FLASK_INTERNAL_URL` dans `backend/.env`, puis redémarrer
+FastAPI. Un HTTP 503 avec `maintenance_status_unavailable` signifie que FastAPI
+ne peut pas vérifier le statut Flask ; les routes de l'application restent alors
+bloquées jusqu'au retour de ce service.
 
 ---
 
@@ -414,7 +436,9 @@ C:\Users\hp\Desktop\flutter\bin\flutter.bat analyze
 cd C:\Users\hp\Desktop\heliantha_mobile_starter\backend
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+$env:CHECKOUT_WRITE_ENABLED='false'
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8011
+```
 
 Swagger :
 
@@ -422,16 +446,41 @@ Swagger :
 http://127.0.0.1:8011/docs
 ```
 
-Important pour les devis : le moteur Flask doit tourner separement sur `http://127.0.0.1:8012`.
-
-### 3. Demarrer Flutter sur Chrome
+### 3. Demarrer le moteur Flask
 
 Ouvrir un deuxieme terminal PowerShell :
 
 ```powershell
+cd "C:\Users\hp\Desktop\HELIANTHA SOLAIRE"
+& "C:\Program Files\Python311\python.exe" run.py
+```
+
+Utiliser ce chemin même si le terminal affiche `(.venv)` : il appelle le Python
+contenant Flask et non celui de l'environnement FastAPI.
+
+Flask ecoute sur `http://127.0.0.1:5000`. Ce service est necessaire pour les
+devis et le statut de maintenance, meme pour ouvrir le catalogue ou le panier.
+Avec la configuration locale par defaut, conserver ce port.
+
+Pour verifier la connexion avant d'ouvrir Flutter :
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:5000/api/maintenance/status
+Invoke-RestMethod http://127.0.0.1:8011/v1/maintenance/status
+```
+
+Les deux doivent repondre avec un booleen `maintenance`. Si le service Flask
+est arrete ou inaccessible, FastAPI renvoie HTTP 503 avec
+`maintenance_status_unavailable`.
+
+### 4. Demarrer Flutter sur Chrome
+
+Ouvrir un troisieme terminal PowerShell :
+
+```powershell
 cd C:\Users\hp\Desktop\heliantha_mobile_starter\mobile
 C:\Users\hp\Desktop\flutter\bin\flutter.bat run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://127.0.0.1:8011
-
+```
 
 URL Chrome :
 
@@ -439,7 +488,7 @@ URL Chrome :
 http://localhost:3000
 ```
 
-### 4. Refaire le ZIP du pont PrestaShop si besoin
+### 5. Refaire le ZIP du pont PrestaShop si besoin
 
 ```powershell
 cd C:\Users\hp\Desktop\heliantha_mobile_starter\prestashop_bridge_example

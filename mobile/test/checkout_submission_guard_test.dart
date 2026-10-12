@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +26,7 @@ class _PendingCheckoutRepository implements CheckoutRepository {
     int? languageId,
     int? carrierId,
     int? addressId,
+    CancelToken? cancelToken,
   }) async =>
       CheckoutPreview.fromJson({
         'lines': [],
@@ -61,7 +63,8 @@ class _PendingCheckoutRepository implements CheckoutRepository {
 }
 
 void main() {
-  testWidgets('checkout blocks rapid taps, unlocks after failure and confirms once',
+  testWidgets(
+      'checkout blocks rapid taps, unlocks after failure and confirms once',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(800, 1800);
@@ -112,7 +115,8 @@ void main() {
     await tester.ensureVisible(find.byType(CheckboxListTile));
     await tester.tap(find.byType(CheckboxListTile));
     await tester.pumpAndSettle();
-    final confirmAction = find.widgetWithText(FilledButton, 'Confirmer la commande');
+    final confirmAction =
+        find.widgetWithText(FilledButton, 'Confirmer la commande');
     await tester.ensureVisible(confirmAction);
     final submit = tester.widget<FilledButton>(confirmAction).onPressed!;
     submit();

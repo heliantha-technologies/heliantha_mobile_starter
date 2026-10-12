@@ -39,6 +39,7 @@ class PrestaShopClient:
         self.auth = httpx.BasicAuth(settings.prestashop_webservice_key, "")
         self.prestashop_calls = 0
         self.prestashop_time_ms = 0.0
+        self.cache_time_ms = 0.0
 
     def _check_config(self) -> None:
         if not self.settings.prestashop_webservice_key:
@@ -62,7 +63,9 @@ class PrestaShopClient:
         redis_cache_key: str | None = None
         if method.upper() == "GET" and self._is_cacheable_get_resource(resource):
             redis_cache_key = cache_key(resource, merged_params)
+            cache_start = monotonic()
             cached = get_json(redis_cache_key)
+            self.cache_time_ms += (monotonic() - cache_start) * 1000
             if cached is not None:
                 return cached
 
@@ -86,7 +89,9 @@ class PrestaShopClient:
             )
         payload = response.json()
         if redis_cache_key is not None:
+            cache_start = monotonic()
             set_json(redis_cache_key, payload)
+            self.cache_time_ms += (monotonic() - cache_start) * 1000
         return payload
 
     async def list_resource(
@@ -175,6 +180,7 @@ class PrestaShopClient:
     def reset_perf(self) -> None:
         self.prestashop_calls = 0
         self.prestashop_time_ms = 0.0
+        self.cache_time_ms = 0.0
 
     def _is_cacheable_get_resource(self, resource: str) -> bool:
         root_resource = resource.lstrip("/").split("/", 1)[0]

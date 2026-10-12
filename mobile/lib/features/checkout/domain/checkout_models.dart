@@ -36,6 +36,7 @@ class CheckoutPreview {
     required this.payments,
     required this.selectedCarrierId,
     required this.stockOk,
+    this.message,
     required this.writeEnabled,
     required this.bridgeRequired,
   });
@@ -46,6 +47,7 @@ class CheckoutPreview {
   final List<CheckoutPayment> payments;
   final int? selectedCarrierId;
   final bool stockOk;
+  final String? message;
   final bool writeEnabled;
   final List<String> bridgeRequired;
 
@@ -68,6 +70,7 @@ class CheckoutPreview {
           .toList(),
       selectedCarrierId: (json['selected_carrier_id'] as num?)?.toInt(),
       stockOk: json['stock_ok'] == true,
+      message: json['message']?.toString(),
       writeEnabled: json['write_enabled'] == true,
       bridgeRequired: (json['bridge_required'] as List<dynamic>? ?? [])
           .map((value) => value.toString())

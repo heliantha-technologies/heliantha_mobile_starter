@@ -23,6 +23,19 @@ class FakeRedis:
         self.values[key] = value
 
 
+class FlakyRedis(FakeRedis):
+    def __init__(self):
+        super().__init__()
+        self.fail = True
+        self.read_attempts = 0
+
+    def get(self, key: str) -> str | None:
+        self.read_attempts += 1
+        if self.fail:
+            raise TimeoutError("Redis unavailable")
+        return super().get(key)
+
+
 class FakeResponse:
     status_code = 200
     headers = {"content-type": "application/json"}
@@ -104,3 +117,34 @@ async def test_sensitive_get_request_bypasses_redis_cache(monkeypatch):
     assert first == second == {"orders": [{"id": 10}]}
     assert http.request.call_count == 2
     assert fake_redis.values == {}
+
+
+async def test_redis_timeout_is_skipped_until_retry_then_cache_recovers(monkeypatch):
+    fake_redis = FlakyRedis()
+    now = [100.0]
+    monkeypatch.setattr(prestashop_cache, "_redis_client", fake_redis)
+    monkeypatch.setattr(prestashop_cache, "_failed_client", None)
+    monkeypatch.setattr(prestashop_cache, "_retry_after", 0.0)
+    monkeypatch.setattr(prestashop_cache, "monotonic", lambda: now[0])
+    monkeypatch.setattr(prestashop_cache, "redis", object())
+
+    client = PrestaShopClient(_settings())
+    http = AsyncMock()
+    http.request = AsyncMock(
+        return_value=FakeResponse({"products": [{"id": 10}]})
+    )
+    monkeypatch.setattr(client, "_shared_client", lambda: http)
+
+    await client._request("GET", "products/10")
+    await client._request("GET", "products/10")
+    assert prestashop_cache.redis_unavailable() is True
+    assert fake_redis.read_attempts == 1
+    assert http.request.call_count == 2
+
+    fake_redis.fail = False
+    now[0] += prestashop_cache.REDIS_FAILURE_COOLDOWN_SECONDS + 1
+    await client._request("GET", "products/10")
+    await client._request("GET", "products/10")
+    assert prestashop_cache.redis_unavailable() is False
+    assert fake_redis.read_attempts == 3
+    assert http.request.call_count == 3

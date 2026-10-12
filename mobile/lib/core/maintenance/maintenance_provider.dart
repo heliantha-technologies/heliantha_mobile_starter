@@ -43,6 +43,14 @@ class MaintenanceRepository {
         '_': DateTime.now().millisecondsSinceEpoch,
       },
       cancelToken: cancelToken,
+      // On web Dio waits for response headers within connectTimeout. A long
+      // poll can intentionally send no headers for 25 seconds; give it the
+      // same margin as receiveTimeout while keeping the initial check quick.
+      options: Options(
+        connectTimeout: previous == null
+            ? const Duration(seconds: 5)
+            : const Duration(seconds: 32),
+      ),
     );
     final data = response.data;
     if (data is! Map || data['maintenance'] is! bool) {

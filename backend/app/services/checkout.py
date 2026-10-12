@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 from typing import Any
 
 from app.clients.bridge import (
@@ -65,6 +67,24 @@ class CheckoutService:
             self._line_out(line, products_by_id.get(line.product_id))
             for line in payload.lines
         ]
+        unavailable = any(
+            not line.available and line.product_attribute_id == 0
+            for line in lines
+        )
+        if unavailable:
+            # A fresh grouped read avoids blocking a product that was recently
+            # restocked while still returning line-level diagnostics.
+            products = await self.catalog.products_by_ids(
+                [line.product_id for line in payload.lines],
+                language_id=payload.language_id,
+                currency_id=payload.currency_id,
+                force_refresh=True,
+            )
+            products_by_id = {product.id: product for product in products}
+            lines = [
+                self._line_out(line, products_by_id.get(line.product_id))
+                for line in payload.lines
+            ]
         preview = CheckoutPreviewOut(
             modes=["guest", "login"],
             personal_fields=self._personal_fields(),
@@ -92,6 +112,28 @@ class CheckoutService:
             ],
         )
 
+        if not preview.stock_ok:
+            currency = next((line.currency for line in lines), "MAD")
+            currency_symbol = next(
+                (line.currency_symbol for line in lines), currency
+            )
+            preview.message = (
+                "Un ou plusieurs produits ne sont plus disponibles dans les "
+                "quantités demandées. Ajustez les lignes avant de continuer."
+            )
+            preview.totals = CheckoutTotalsOut(
+                subtotal=sum(line.total for line in lines if line.available),
+                shipping=None,
+                shipping_label="À recalculer après correction du stock",
+                discounts=0,
+                total_ttc=0,
+                taxes_included=True,
+                currency=currency,
+                currency_symbol=currency_symbol,
+                source="catalog_stock_check",
+            )
+            return preview
+
         if self.bridge is None:
             raise BridgeUnavailable("Bridge PrestaShop requis pour le checkout.")
 
@@ -106,13 +148,74 @@ class CheckoutService:
             )
         except BridgeUnavailable:
             raise
-        except BridgeHTTPError:
-            raise
+        except BridgeHTTPError as exc:
+            if exc.code != "INSUFFICIENT_STOCK":
+                raise
+            return self._stock_conflict_preview(preview, exc)
 
         data = result.get("data", result)
         if isinstance(data, dict):
             preview = self._merge_bridge_preview(preview, data)
 
+        return preview
+
+    def _stock_conflict_preview(
+        self,
+        preview: CheckoutPreviewOut,
+        error: BridgeHTTPError,
+    ) -> CheckoutPreviewOut:
+        detail = ""
+        try:
+            body = json.loads(error.body or "{}")
+            detail = str((body.get("error") or {}).get("detail") or "")
+        except (TypeError, ValueError, AttributeError):
+            pass
+        product_id_match = re.search(r"product_id=(\d+)", detail)
+        requested_match = re.search(r"requested=(\d+)", detail)
+        available_match = re.search(r"available=(-?\d+)", detail)
+        product_id = int(product_id_match.group(1)) if product_id_match else None
+        requested = int(requested_match.group(1)) if requested_match else None
+        available = int(available_match.group(1)) if available_match else None
+        affected_product_id = product_id
+        if affected_product_id is None and preview.lines:
+            affected_product_id = preview.lines[0].product_id
+        preview.lines = [
+            line.model_copy(
+                update={
+                    "available": False,
+                    "stock_quantity": available,
+                    "stock_message": (
+                        f"Stock insuffisant : {available} disponible(s)"
+                        + (
+                            f" pour {requested} demandé(s)."
+                            if requested is not None
+                            else "."
+                        )
+                        if available is not None
+                        else error.detail
+                    ),
+                }
+            )
+            if line.product_id == affected_product_id
+            else line
+            for line in preview.lines
+        ]
+        preview.stock_ok = False
+        preview.message = (
+            "Le stock a changé pendant la vérification. "
+            "Ajustez la quantité puis relancez l’aperçu."
+        )
+        preview.totals = CheckoutTotalsOut(
+            subtotal=sum(line.total for line in preview.lines if line.available),
+            shipping=None,
+            shipping_label="À recalculer après correction du stock",
+            discounts=0,
+            total_ttc=0,
+            taxes_included=True,
+            currency=preview.totals.currency,
+            currency_symbol=preview.totals.currency_symbol,
+            source="prestashop_stock_conflict",
+        )
         return preview
 
     def _merge_bridge_preview(
@@ -205,7 +308,9 @@ class CheckoutService:
             )
 
         enough_stock = (
-            product.quantity is None or product.quantity >= line.quantity
+            line.product_attribute_id != 0
+            or product.quantity is None
+            or product.quantity >= line.quantity
         )
         available = product.available and enough_stock
         stock_message = None

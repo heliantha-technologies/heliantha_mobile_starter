@@ -14,9 +14,11 @@ class CheckoutRepository {
     int? languageId,
     int? carrierId,
     int? addressId,
+    CancelToken? cancelToken,
   }) async {
     final response = await _api.dio.post(
       '/v1/checkout/preview',
+      cancelToken: cancelToken,
       data: {
         'lines': [for (final line in lines) line.toJson()],
         if (currencyId != null) 'currency_id': currencyId,

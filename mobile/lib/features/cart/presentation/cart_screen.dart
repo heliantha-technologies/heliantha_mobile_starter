@@ -57,7 +57,15 @@ class CartScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: _CartList(items: items),
+                            child: Column(
+                              children: [
+                                const Align(
+                                  alignment: Alignment.centerRight,
+                                  child: _ClearCartButton(),
+                                ),
+                                Expanded(child: _CartList(items: items)),
+                              ],
+                            ),
                           ),
                           const SizedBox(width: 18),
                           SizedBox(
@@ -91,6 +99,10 @@ class CartScreen extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const Align(
+                                alignment: Alignment.centerRight,
+                                child: _ClearCartButton(),
+                              ),
                               _CartItemsColumn(items: items),
                               const SizedBox(height: 14),
                               _OrderSummary(
@@ -116,6 +128,43 @@ class CartScreen extends ConsumerWidget {
                 },
               ),
       ),
+    );
+  }
+}
+
+class _ClearCartButton extends ConsumerWidget {
+  const _ClearCartButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return TextButton.icon(
+      onPressed: () async {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Vider le panier ?'),
+            content: const Text(
+              'Tous les produits seront retirés de votre panier.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Annuler'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Vider le panier'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed == true && context.mounted) {
+          ref.read(cartProvider.notifier).clear();
+        }
+      },
+      icon: const Icon(Icons.delete_sweep_outlined),
+      label: const Text('Vider le panier'),
+      style: TextButton.styleFrom(foregroundColor: AppColors.danger),
     );
   }
 }

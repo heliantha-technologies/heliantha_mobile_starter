@@ -50,7 +50,10 @@ final appRouter = GoRouter(
   routes: [
     StatefulShellRoute.indexedStack(
       parentNavigatorKey: _rootNavigatorKey,
-      builder: (context, state, shell) => _Shell(shell: shell),
+      builder: (context, state, shell) => _Shell(
+        shell: shell,
+        location: state.uri.path,
+      ),
       branches: [
         StatefulShellBranch(
           navigatorKey: _homeNavigatorKey,
@@ -190,9 +193,10 @@ final appRouter = GoRouter(
 );
 
 class _Shell extends StatelessWidget {
-  const _Shell({required this.shell});
+  const _Shell({required this.shell, required this.location});
 
   final StatefulNavigationShell shell;
+  final String location;
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +211,8 @@ class _Shell extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             shell,
-            if (shell.currentIndex == 0 || shell.currentIndex == 1)
+            if ((shell.currentIndex == 0 || shell.currentIndex == 1) &&
+                !location.startsWith('/quote'))
               Positioned.fill(
                 child: TickerMode(
                   enabled: !MediaQuery.disableAnimationsOf(context),

@@ -273,6 +273,7 @@ async def test_checkout_preview_parallel_gathering():
     """
     from app.services.checkout import CheckoutService
     from app.schemas.checkout import CheckoutPreviewIn, CheckoutLineIn
+    from app.schemas.product import ProductOut
 
     mock_ps = AsyncMock()
     mock_catalog = AsyncMock()
@@ -296,7 +297,15 @@ async def test_checkout_preview_parallel_gathering():
     svc = CheckoutService(ps=mock_ps, catalog=mock_catalog, settings=settings, bridge=mock_bridge)
 
     # Mock catalog products_by_ids and morocco_country_id
-    svc.catalog.products_by_ids = AsyncMock(return_value=[])
+    svc.catalog.products_by_ids = AsyncMock(return_value=[ProductOut(
+        id=10,
+        name="Panneau de test",
+        price=100,
+        currency="MAD",
+        currency_symbol="DH",
+        available=True,
+        quantity=5,
+    )])
     svc._morocco_country_id = AsyncMock(return_value=140)
 
     req = CheckoutPreviewIn(
