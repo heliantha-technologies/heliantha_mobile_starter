@@ -292,14 +292,17 @@ def _log_perf(
 ) -> None:
     total_ms = (monotonic() - start) * 1000
     prestashop_ms = ps.prestashop_time_ms
-    normalize_ms = max(0.0, total_ms - prestashop_ms)
+    cache_time = getattr(ps, "cache_time_ms", 0.0)
+    redis_ms = cache_time if isinstance(cache_time, (int, float)) else 0.0
+    normalize_ms = max(0.0, total_ms - prestashop_ms - redis_ms)
     cache_part = f" cache={cache}" if cache else ""
     logger.warning(
-        "PERF %s total=%dms prestashop=%dms normalize=%dms calls=%d%s",
+        "PERF %s total=%dms prestashop=%dms normalize=%dms calls=%d redis=%dms%s",
         name,
         round(total_ms),
         round(prestashop_ms),
         round(normalize_ms),
         ps.prestashop_calls,
+        round(redis_ms),
         cache_part,
     )

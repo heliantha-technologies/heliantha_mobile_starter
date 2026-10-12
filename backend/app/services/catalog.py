@@ -5,6 +5,7 @@ from typing import Any
 
 from app.clients.prestashop import PrestaShopClient
 from app.core.config import Settings
+from app.core.prestashop_cache import redis_unavailable
 from app.core.single_flight import single_flight
 from app.schemas.product import (
     CategoryOut,
@@ -47,6 +48,7 @@ PRODUCT_CACHE_TTL_SECONDS = 20
 SEARCH_CACHE_TTL_SECONDS = 25
 PRODUCT_STALE_TTL_SECONDS = 30
 PRODUCT_DETAIL_CACHE_TTL_SECONDS = 20
+PRODUCT_DETAIL_FALLBACK_TTL_SECONDS = 15 * 60
 HIDDEN_CATEGORY_IDS = {1, 2}
 PRODUCT_ID_BATCH_SIZE = 80
 SEARCH_INDEX_DISPLAY = "[id,name,reference,description_short]"
@@ -68,7 +70,7 @@ class CatalogService:
     ] = {}
     _product_detail_cache: dict[
         str,
-        tuple[float, ProductOut],
+        tuple[float, ProductOut, float],
     ] = {}
 
     def __init__(
@@ -91,6 +93,22 @@ class CatalogService:
         cls._category_product_ids_cache.clear()
         cls._products_cache.clear()
         cls._product_detail_cache.clear()
+
+    @classmethod
+    def _read_product_detail_cache(
+        cls, key: str, now: float, *, allow_fallback: bool = True
+    ) -> ProductOut | None:
+        cached = cls._product_detail_cache.get(key)
+        if cached is None:
+            return None
+        normal_until, product, fallback_until = cached
+        if normal_until > now or (
+            allow_fallback and redis_unavailable() and fallback_until > now
+        ):
+            return product
+        if fallback_until <= now:
+            cls._product_detail_cache.pop(key, None)
+        return None
 
     # ---------------------------------------------------------
     # CATEGORIES
@@ -268,6 +286,7 @@ class CatalogService:
         *,
         language_id: int | None = None,
         currency_id: int | None = None,
+        force_refresh: bool = False,
     ) -> list[ProductOut]:
         clean_ids = [
             product_id
@@ -278,14 +297,44 @@ class CatalogService:
             return []
 
         effective_language_id = self._language_id(language_id)
+        now = monotonic()
+        currency_key = currency_id or ""
+        cached_by_id: dict[int, ProductOut] = {}
+
+        # Reuse fresh product rows already loaded by catalog/detail screens.
+        # The checkout bridge still validates the real cart, price, and stock.
+        if not force_refresh:
+            for product_id in clean_ids:
+                detail_key = (
+                    f"product:id={product_id}:lang={effective_language_id}:"
+                    f"currency={currency_key}"
+                )
+                detail = self.__class__._read_product_detail_cache(
+                    detail_key, now, allow_fallback=False
+                )
+                if detail is not None:
+                    cached_by_id[product_id] = detail
+
+            cache_suffix = f"lang={effective_language_id}:currency={currency_key}"
+            for key, (fresh_until, _, cached_products, _) in self.__class__._products_cache.items():
+                if fresh_until <= now or not key.endswith(cache_suffix):
+                    continue
+                for product in cached_products:
+                    if product.id in clean_ids:
+                        cached_by_id.setdefault(product.id, product)
+
+        missing_ids = [product_id for product_id in clean_ids if product_id not in cached_by_id]
+        if not missing_ids:
+            return [cached_by_id[product_id] for product_id in clean_ids]
+
         payload = await self.ps.list_resource(
             "products",
             display=PRODUCT_LIST_DISPLAY,
             filters={
-                "id": "[" + "|".join(str(product_id) for product_id in clean_ids) + "]",
+                "id": "[" + "|".join(str(product_id) for product_id in missing_ids) + "]",
                 "active": "[1]",
             },
-            limit=f"0,{len(clean_ids)}",
+            limit=f"0,{len(missing_ids)}",
             params={"language": effective_language_id},
         )
         rows = unwrap_collection(payload, "products")
@@ -305,7 +354,8 @@ class CatalogService:
             for row in rows
         ]
         by_id = {product.id: product for product in products}
-        return [by_id[product_id] for product_id in clean_ids if product_id in by_id]
+        cached_by_id.update(by_id)
+        return [cached_by_id[product_id] for product_id in clean_ids if product_id in cached_by_id]
 
     async def category_ids_for_product(
         self,
@@ -787,14 +837,16 @@ class CatalogService:
             f"product:id={product_id}:lang={effective_language_id}:"
             f"currency={currency_id or ''}"
         )
-        cached = self.__class__._product_detail_cache.get(cache_key)
-        if cached and cached[0] > monotonic():
-            return cached[1]
+        cached = self.__class__._read_product_detail_cache(cache_key, monotonic())
+        if cached is not None:
+            return cached
 
         async def _fetch() -> ProductOut:
-            cached_inner = self.__class__._product_detail_cache.get(cache_key)
-            if cached_inner and cached_inner[0] > monotonic():
-                return cached_inner[1]
+            cached_inner = self.__class__._read_product_detail_cache(
+                cache_key, monotonic()
+            )
+            if cached_inner is not None:
+                return cached_inner
 
             payload = await self.ps.get_resource(
                 "products",
@@ -822,9 +874,11 @@ class CatalogService:
                 currency_id=currency_id,
             )
 
+            cached_at = monotonic()
             self.__class__._product_detail_cache[cache_key] = (
-                monotonic() + PRODUCT_DETAIL_CACHE_TTL_SECONDS,
+                cached_at + PRODUCT_DETAIL_CACHE_TTL_SECONDS,
                 product,
+                cached_at + PRODUCT_DETAIL_FALLBACK_TTL_SECONDS,
             )
             return product
 

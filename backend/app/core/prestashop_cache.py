@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from time import monotonic
 from typing import Any
 
 try:
@@ -14,11 +15,21 @@ logger = logging.getLogger(__name__)
 
 PRESTASHOP_CACHE_PREFIX = "prestashop:cache:"
 PRESTASHOP_CACHE_TTL_SECONDS = 900
+REDIS_FAILURE_COOLDOWN_SECONDS = 30
 
 _redis_client: Any | None = None
+_failed_client: Any | None = None
+_retry_after = 0.0
 
 
-def _client() -> Any | None:
+def redis_unavailable() -> bool:
+    """Report a missing Redis dependency or a client with a known failure."""
+    return redis is None or (
+        _redis_client is not None and _redis_client is _failed_client
+    )
+
+
+def _client(*, force: bool = False) -> Any | None:
     global _redis_client
     if redis is None:
         return None
@@ -30,7 +41,32 @@ def _client() -> Any | None:
             socket_connect_timeout=0.2,
             socket_timeout=0.2,
         )
+    if (
+        not force
+        and _redis_client is _failed_client
+        and monotonic() < _retry_after
+    ):
+        return None
     return _redis_client
+
+
+def _mark_failure(client: Any, operation: str, exc: Exception) -> None:
+    global _failed_client, _retry_after
+    _failed_client = client
+    _retry_after = monotonic() + REDIS_FAILURE_COOLDOWN_SECONDS
+    logger.warning(
+        "Redis cache %s failed; retry in %ds: %s",
+        operation,
+        REDIS_FAILURE_COOLDOWN_SECONDS,
+        exc,
+    )
+
+
+def _mark_success(client: Any) -> None:
+    global _failed_client, _retry_after
+    if _failed_client is client:
+        _failed_client = None
+        _retry_after = 0.0
 
 
 def cache_key(resource: str, params: dict[str, Any]) -> str:
@@ -49,11 +85,16 @@ def get_json(key: str) -> Any | None:
         return None
     try:
         cached = client.get(key)
-        if cached is None:
-            return None
-        return json.loads(cached)
     except Exception as exc:
-        logger.warning("Redis cache read failed for %s: %s", key, exc)
+        _mark_failure(client, "read", exc)
+        return None
+    _mark_success(client)
+    if cached is None:
+        return None
+    try:
+        return json.loads(cached)
+    except (TypeError, ValueError) as exc:
+        logger.warning("Redis cache invalid JSON for %s: %s", key, exc)
         return None
 
 
@@ -66,17 +107,25 @@ def set_json(
     if client is None:
         return
     try:
+        encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError) as exc:
+        logger.warning("Redis cache cannot serialize %s: %s", key, exc)
+        return
+    try:
         client.setex(
             key,
             ttl_seconds,
-            json.dumps(value, ensure_ascii=False, separators=(",", ":")),
+            encoded,
         )
     except Exception as exc:
-        logger.warning("Redis cache write failed for %s: %s", key, exc)
+        _mark_failure(client, "write", exc)
+    else:
+        _mark_success(client)
 
 
 def clear_prestashop_cache() -> int:
-    client = _client()
+    # Cache invalidation must still try Redis during a temporary cooldown.
+    client = _client(force=True)
     if client is None:
         return 0
     deleted = 0
@@ -90,5 +139,7 @@ def clear_prestashop_cache() -> int:
             if cursor == 0:
                 break
     except Exception as exc:
-        logger.warning("Redis cache clear failed: %s", exc)
+        _mark_failure(client, "clear", exc)
+    else:
+        _mark_success(client)
     return deleted
