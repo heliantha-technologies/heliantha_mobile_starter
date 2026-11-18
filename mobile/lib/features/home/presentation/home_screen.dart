@@ -1152,6 +1152,7 @@ class _SolarUniverse {
     required this.displayName,
     required this.icon,
     this.svgString,
+    required this.imageAsset,
     required this.gradient,
     required this.iconColor,
     required this.categoryNames,
@@ -1161,6 +1162,7 @@ class _SolarUniverse {
   final String displayName;
   final IconData icon;
   final String? svgString;
+  final String imageAsset;
   final List<Color> gradient;
   final Color iconColor;
   final List<String> categoryNames;
@@ -1205,6 +1207,7 @@ const _solarUniverses = [
     displayName: 'Panneaux Solaires',
     icon: Icons.solar_power_outlined,
     svgString: AppVectorIcons.solarPanel,
+    imageAsset: 'assets/categories/cat_panneaux.jpg',
     gradient: [Color(0xFFFEF3C7), Color(0xFFFCD34D)],
     iconColor: Color(0xFFB45309),
     categoryNames: [
@@ -1219,6 +1222,7 @@ const _solarUniverses = [
     displayName: 'Onduleurs & Hybrides',
     icon: Icons.electric_bolt_outlined,
     svgString: AppVectorIcons.inverter,
+    imageAsset: 'assets/categories/cat_onduleurs.jpg',
     gradient: [Color(0xFFE0E7FF), Color(0xFFC7D2FE)],
     iconColor: Color(0xFF3730A3),
     categoryNames: [
@@ -1233,6 +1237,7 @@ const _solarUniverses = [
     displayName: 'Batteries & Stockage',
     icon: Icons.battery_charging_full_outlined,
     svgString: AppVectorIcons.battery,
+    imageAsset: 'assets/categories/cat_batteries.jpg',
     gradient: [Color(0xFFD1FAE5), Color(0xFFA7F3D0)],
     iconColor: Color(0xFF065F46),
     categoryNames: [
@@ -1247,6 +1252,7 @@ const _solarUniverses = [
     displayName: 'Pompage & Variateurs',
     icon: Icons.water_drop_outlined,
     svgString: AppVectorIcons.pump,
+    imageAsset: 'assets/categories/cat_pompage.jpg',
     gradient: [Color(0xFFE0F2FE), Color(0xFFBAE6FD)],
     iconColor: Color(0xFF0284C7),
     categoryNames: [
@@ -1261,6 +1267,7 @@ const _solarUniverses = [
     displayName: 'Coffrets & Câblage',
     icon: Icons.shield_outlined,
     svgString: AppVectorIcons.shieldBreaker,
+    imageAsset: 'assets/categories/cat_coffrets.jpg',
     gradient: [Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
     iconColor: Color(0xFF334155),
     categoryNames: [
@@ -1276,6 +1283,7 @@ const _solarUniverses = [
     displayName: 'Éclairage Solaire',
     icon: Icons.wb_incandescent_outlined,
     svgString: AppVectorIcons.solarLighting,
+    imageAsset: 'assets/categories/cat_eclairage.jpg',
     gradient: [Color(0xFFFEF9C3), Color(0xFFFEF08A)],
     iconColor: Color(0xFFA16207),
     categoryNames: [
@@ -1421,7 +1429,7 @@ class _CategoryGlassCardState extends State<_CategoryGlassCard> {
                   onTap: widget.onTap,
                   child: Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     decoration: BoxDecoration(
                       color: active
                           ? Colors.white.withValues(alpha: 0.96)
@@ -1434,64 +1442,79 @@ class _CategoryGlassCardState extends State<_CategoryGlassCard> {
                         width: active ? 1.4 : 1.1,
                       ),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: meta.gradient,
-                            ),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.85),
-                              width: 1.0,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: meta.iconColor.withValues(alpha: 0.16),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: meta.svgString != null
-                                ? AppSvgIcon(
-                                    meta.svgString!,
-                                    size: 22,
-                                    color: meta.iconColor,
-                                  )
-                                : Icon(
-                                    meta.icon,
-                                    size: 22,
-                                    color: meta.iconColor,
+                    child: LayoutBuilder(
+                      builder: (context, cardConstraints) {
+                        final thumbSize =
+                            cardConstraints.maxHeight >= 114 ? 58.0 : 52.0;
+                        return Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: thumbSize,
+                              height: thumbSize,
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: active
+                                      ? meta.iconColor.withValues(alpha: 0.48)
+                                      : meta.gradient.last
+                                          .withValues(alpha: 0.72),
+                                  width: 1.15,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: meta.iconColor.withValues(
+                                      alpha: active ? 0.18 : 0.10,
+                                    ),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
                                   ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.center,
-                            child: Text(
-                              meta.displayName,
-                              textAlign: TextAlign.center,
-                              maxLines: 3,
-                              style: const TextStyle(
-                                color: Color(0xFF0F172A),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                height: 1.18,
-                                letterSpacing: -0.2,
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.asset(
+                                  meta.imageAsset,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: meta.svgString != null
+                                        ? AppSvgIcon(
+                                            meta.svgString!,
+                                            size: 22,
+                                            color: meta.iconColor,
+                                          )
+                                        : Icon(
+                                            meta.icon,
+                                            size: 22,
+                                            color: meta.iconColor,
+                                          ),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      ],
+                            const SizedBox(height: 6),
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.center,
+                                child: Text(
+                                  meta.displayName,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 3,
+                                  style: const TextStyle(
+                                    color: Color(0xFF0F172A),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.18,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -1600,72 +1623,107 @@ class _SupportPanelState extends State<_SupportPanel> {
         key: const ValueKey('home-support-panel'),
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFFFFFFF),
+              Color(0xFFF4F8FC),
+            ],
+          ),
           border: Border.all(
             color: _hovered
-                ? const Color(0xFF25D366).withValues(alpha: 0.45)
-                : const Color(0xFFE2E8F0),
-            width: 1.0,
+                ? const Color(0xFF0A6097).withValues(alpha: 0.42)
+                : const Color(0xFFD7E2EE),
+            width: _hovered ? 1.35 : 1.1,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0F172A).withValues(
-                alpha: _hovered ? 0.07 : 0.035,
+              color: const Color(0xFF0B2239).withValues(
+                alpha: _hovered ? 0.11 : 0.06,
               ),
-              blurRadius: _hovered ? 14 : 8,
-              offset: const Offset(0, 2),
+              blurRadius: _hovered ? 22 : 14,
+              offset: Offset(0, _hovered ? 8 : 5),
             ),
             if (_hovered)
               BoxShadow(
-                color: const Color(0xFF25D366).withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
+                color: const Color(0xFF10B981).withValues(alpha: 0.10),
+                blurRadius: 16,
+                offset: const Offset(0, 3),
               ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: _openWhatsApp,
-              splashColor: const Color(0xFF25D366).withValues(alpha: 0.08),
-              highlightColor: const Color(0xFF25D366).withValues(alpha: 0.03),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isWide = constraints.maxWidth >= 540 &&
-                        MediaQuery.textScalerOf(context).scale(14) <= 16;
-                    final button = _WhatsAppCtaButton(
-                      hovered: _hovered,
-                    );
-
-                    if (isWide) {
-                      return Row(
-                        children: [
-                          const Expanded(child: _SupportPanelText()),
-                          const SizedBox(width: 16),
-                          SizedBox(width: 210, child: button),
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              // Accent lumineux discret en haut à droite (sans BackdropFilter)
+              Positioned(
+                top: -28,
+                right: -18,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 110,
+                    height: 110,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF10B981).withValues(alpha: 0.10),
+                          const Color(0xFF10B981).withValues(alpha: 0.0),
                         ],
-                      );
-                    }
-
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const _SupportPanelText(),
-                        const SizedBox(height: 9),
-                        button,
-                      ],
-                    );
-                  },
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: _openWhatsApp,
+                  splashColor: const Color(0xFF0B2239).withValues(alpha: 0.06),
+                  highlightColor:
+                      const Color(0xFF0B2239).withValues(alpha: 0.03),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 13,
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth >= 540 &&
+                            MediaQuery.textScalerOf(context).scale(14) <= 16;
+                        final button = _WhatsAppCtaButton(
+                          hovered: _hovered,
+                        );
+
+                        if (isWide) {
+                          return Row(
+                            children: [
+                              const Expanded(child: _SupportPanelText()),
+                              const SizedBox(width: 16),
+                              SizedBox(width: 226, child: button),
+                            ],
+                          );
+                        }
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const _SupportPanelText(),
+                            const SizedBox(height: 12),
+                            button,
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1679,28 +1737,32 @@ class _SupportIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34,
-      height: 34,
+      width: 42,
+      height: 42,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(13),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF25D366), Color(0xFF16A34A)],
+          colors: [Color(0xFF0B2239), Color(0xFF13355B)],
+        ),
+        border: Border.all(
+          color: const Color(0xFF25D366).withValues(alpha: 0.40),
+          width: 1.1,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF25D366).withValues(alpha: 0.30),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: const Color(0xFF0B2239).withValues(alpha: 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: const Center(
-        child: Icon(
-          Icons.chat_bubble_rounded,
-          color: Colors.white,
-          size: 17,
+        child: AppSvgIcon(
+          AppVectorIcons.whatsapp,
+          color: Color(0xFF25D366),
+          size: 21,
         ),
       ),
     );
@@ -1713,33 +1775,33 @@ class _LiveBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
       decoration: BoxDecoration(
-        color: const Color(0xFFECFDF5),
+        color: const Color(0xFFE7F6EF),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: const Color(0xFF86EFAC).withValues(alpha: 0.8),
-          width: 0.8,
+          color: const Color(0xFF10B981).withValues(alpha: 0.38),
+          width: 0.85,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 5,
-            height: 5,
+            width: 5.5,
+            height: 5.5,
             decoration: const BoxDecoration(
               color: Color(0xFF10B981),
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 4.5),
           const Text(
             'En direct',
             style: TextStyle(
-              color: Color(0xFF047857),
-              fontSize: 9.5,
-              fontWeight: FontWeight.w700,
+              color: Color(0xFF065F46),
+              fontSize: 9.8,
+              fontWeight: FontWeight.w800,
               letterSpacing: 0.2,
             ),
           ),
@@ -1758,7 +1820,7 @@ class _SupportPanelText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         const _SupportIcon(),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1772,15 +1834,15 @@ class _SupportPanelText extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: const Color(0xFF0F172A),
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.2,
+                            color: const Color(0xFF0B2239),
+                            fontSize: 15.0,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.25,
                             height: 1.2,
                           ),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 7),
                   const _LiveBadge(),
                 ],
               ),
@@ -1789,10 +1851,10 @@ class _SupportPanelText extends StatelessWidget {
                 'Nos experts solaires vous guident dans votre projet.',
                 maxLines: 2,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF64748B),
-                      fontSize: 11.5,
+                      color: const Color(0xFF475569),
+                      fontSize: 12.0,
                       height: 1.3,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: FontWeight.w500,
                     ),
               ),
             ],
@@ -1815,22 +1877,28 @@ class _WhatsAppCtaButton extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      height: 33,
+      height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: hovered
-              ? const [Color(0xFF2EE673), Color(0xFF1EA755)]
-              : const [Color(0xFF25D366), Color(0xFF16A34A)],
+              ? const [Color(0xFF103052), Color(0xFF1A4378)]
+              : const [Color(0xFF0B2239), Color(0xFF132F5B)],
         ),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFF4C33D).withValues(alpha: hovered ? 0.52 : 0.25),
+          width: 0.9,
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF25D366).withValues(alpha: hovered ? 0.30 : 0.16),
-            blurRadius: hovered ? 10 : 6,
-            offset: const Offset(0, 2),
+            color: const Color(0xFF0B2239).withValues(
+              alpha: hovered ? 0.26 : 0.16,
+            ),
+            blurRadius: hovered ? 12 : 8,
+            offset: Offset(0, hovered ? 4 : 3),
           ),
         ],
       ),
@@ -1838,12 +1906,12 @@ class _WhatsAppCtaButton extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.chat_bubble_rounded,
-            size: 13.5,
-            color: Colors.white,
+          AppSvgIcon(
+            AppVectorIcons.whatsapp,
+            size: 15.5,
+            color: Color(0xFF25D366),
           ),
-          SizedBox(width: 7),
+          SizedBox(width: 8),
           Flexible(
             child: Text(
               'Échanger sur WhatsApp',
@@ -1852,17 +1920,17 @@ class _WhatsAppCtaButton extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
                 letterSpacing: -0.1,
               ),
             ),
           ),
-          SizedBox(width: 5),
-          Icon(
-            Icons.arrow_forward_rounded,
-            size: 12.5,
-            color: Colors.white,
+          SizedBox(width: 7),
+          AppSvgIcon(
+            AppVectorIcons.arrowForward,
+            size: 12,
+            color: Color(0xFFF4C33D),
           ),
         ],
       ),

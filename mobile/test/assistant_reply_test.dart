@@ -52,6 +52,31 @@ AssistantApiService _errorService(DioExceptionType type, {int? statusCode}) {
 }
 
 void main() {
+  test(
+      'assistant request carries the selected currency without changing prices',
+      () async {
+    final dio = Dio();
+    addTearDown(() => dio.close(force: true));
+    Map<String, dynamic>? sent;
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (request, handler) {
+      sent = jsonDecode(request.data as String) as Map<String, dynamic>;
+      handler.resolve(Response(
+        requestOptions: request,
+        statusCode: 200,
+        data: jsonEncode({'content': 'Prix catalogue : 12,50 € HT.'}),
+      ));
+    }));
+    final reply = await AssistantApiService(
+      dio: dio,
+      currencyResolver: () async => 'EUR',
+    ).sendReply(history: [
+      {'role': 'user', 'content': 'Prix du panneau ?'}
+    ]);
+
+    expect(sent?['currency'], 'EUR');
+    expect(reply.text, 'Prix catalogue : 12,50 € HT.');
+  });
+
   test('structured reply preserves catalogue facts and the official quote',
       () async {
     final service = _service(jsonEncode({

@@ -74,6 +74,109 @@ class AppVectorIcons {
 </svg>
 ''';
 
+  /// Site sans réseau (Off-Grid) : maison autonome avec énergie intégrée
+  static const String offGridHome = '''
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3 10.5L12 3l9 7.5"/>
+  <path d="M5.5 8.8V20a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5V8.8"/>
+  <path d="M12.8 10.5L10 14.5h4l-2.8 4"/>
+</svg>
+''';
+
+  /// Chauffage solaire : rayonnement solaire et ondes d'eau chaude
+  static const String solarThermal = '''
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="8.5" r="3.2"/>
+  <line x1="12" y1="2.5" x2="12" y2="3.8"/>
+  <line x1="6.8" y1="4.5" x2="7.8" y2="5.5"/>
+  <line x1="17.2" y1="4.5" x2="16.2" y2="5.5"/>
+  <line x1="5" y1="9.5" x2="6.3" y2="9.5"/>
+  <line x1="19" y1="9.5" x2="17.7" y2="9.5"/>
+  <path d="M4.5 15.5c1.7-1.3 3.3-1.3 5 0s3.3 1.3 5 0 3.3-1.3 5 0"/>
+  <path d="M4.5 19.5c1.7-1.3 3.3-1.3 5 0s3.3 1.3 5 0 3.3-1.3 5 0"/>
+</svg>
+''';
+
+  /// Recharge électrique : borne de recharge solaire avec prise et éclair
+  static const String evCharger = '''
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4" y="3" width="11" height="18" rx="2.5"/>
+  <path d="M15 9h1.8a1.7 1.7 0 0 1 1.7 1.7v6.3a1.5 1.5 0 0 0 3 0V8.5L19 6"/>
+  <path d="M10.5 7.5l-2.5 4h3.5l-2.5 4"/>
+</svg>
+''';
+
+  // ==========================================
+  // ICÔNES MULTICOLORES DEVIS B2B (DUOTONE / VIVES)
+  // ==========================================
+
+  /// Pompage solaire multicolore : goutte cyan/azur glossy et onde marine
+  static const String colorPump = '''
+<svg viewBox="0 0 24 24" fill="none">
+  <path d="M12 2.4l5.8 5.9a8.2 8.2 0 1 1-11.6 0L12 2.4z" fill="#38BDF8" stroke="#0369A1" stroke-width="1.75" stroke-linejoin="round"/>
+  <path d="M6.2 14.4c1.7 0.9 3.6 0.9 5.8 0s4.1-0.9 5.8 0a6.6 6.6 0 0 1-11.6 0z" fill="#0284C7"/>
+  <path d="M8.4 13.8c1.2-0.8 2.4-0.8 3.6 0s2.4 0.8 3.6 0" stroke="#E0F2FE" stroke-width="1.65" stroke-linecap="round"/>
+  <circle cx="9.6" cy="9.2" r="1.15" fill="#E0F2FE"/>
+</svg>
+''';
+
+  /// Site sans réseau (Off-Grid) multicolore : maison indigo + toit solaire et éclair or
+  static const String colorOffGridHome = '''
+<svg viewBox="0 0 24 24" fill="none">
+  <path d="M5.5 10.2V19.6a1.6 1.6 0 0 0 1.6 1.6h9.8a1.6 1.6 0 0 0 1.6-1.6v-9.4L12 4.8l-6.5 5.4z" fill="#E0E7FF" stroke="#4338CA" stroke-width="1.65" stroke-linejoin="round"/>
+  <path d="M2.6 10.7L12 3l9.4 7.7" stroke="#3730A3" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M13.2 10.2L9.4 15.1h3.2l-1.8 4.1 4.2-5.1h-3.1l1.3-3.9z" fill="#F59E0B" stroke="#B45309" stroke-width="0.9" stroke-linejoin="round"/>
+</svg>
+''';
+
+  /// Panneau photovoltaïque multicolore : cellules bleu saphir + soleil doré
+  static const String colorSolarPanel = '''
+<svg viewBox="0 0 24 24" fill="none">
+  <circle cx="18.2" cy="5.6" r="3.1" fill="#FBBF24" stroke="#D97706" stroke-width="1.35"/>
+  <rect x="2.6" y="7" width="16.4" height="11.6" rx="2.3" fill="#0284C7" stroke="#0B2239" stroke-width="1.7"/>
+  <line x1="2.8" y1="12.8" x2="18.8" y2="12.8" stroke="#BAE6FD" stroke-width="1.3"/>
+  <line x1="8.1" y1="7.2" x2="8.1" y2="18.4" stroke="#BAE6FD" stroke-width="1.3"/>
+  <line x1="13.5" y1="7.2" x2="13.5" y2="18.4" stroke="#BAE6FD" stroke-width="1.3"/>
+  <path d="M6.2 21.3h9.2" stroke="#0B2239" stroke-width="1.9" stroke-linecap="round"/>
+  <path d="M10.8 18.6v2.7" stroke="#0B2239" stroke-width="1.9" stroke-linecap="round"/>
+</svg>
+''';
+
+  /// Solaire avec batteries multicolore : bloc émeraude + éclair or
+  static const String colorBattery = '''
+<svg viewBox="0 0 24 24" fill="none">
+  <rect x="2.4" y="6.2" width="16.8" height="11.6" rx="2.8" fill="#10B981" stroke="#065F46" stroke-width="1.7"/>
+  <path d="M21.4 9.8v4.4" stroke="#065F46" stroke-width="2.3" stroke-linecap="round"/>
+  <rect x="4.8" y="8.5" width="3.2" height="7" rx="0.9" fill="#D1FAE5"/>
+  <path d="M12.2 8.4L9.2 12.6h2.5l-1.2 3.2 3.5-4.3h-2.5l0.7-3.1z" fill="#FDE047" stroke="#B45309" stroke-width="0.9" stroke-linejoin="round"/>
+</svg>
+''';
+
+  /// Chauffage solaire (Thermique) multicolore : soleil corail/or + ondes d'eau
+  static const String colorSolarThermal = '''
+<svg viewBox="0 0 24 24" fill="none">
+  <circle cx="12" cy="8.4" r="3.4" fill="#FBBF24" stroke="#EA580C" stroke-width="1.65"/>
+  <line x1="12" y1="2.2" x2="12" y2="3.7" stroke="#EA580C" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="6.7" y1="4.2" x2="7.8" y2="5.3" stroke="#EA580C" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="17.3" y1="4.2" x2="16.2" y2="5.3" stroke="#EA580C" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="4.6" y1="9.1" x2="6.1" y2="9.1" stroke="#EA580C" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="17.9" y1="9.1" x2="19.4" y2="9.1" stroke="#EA580C" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M4.2 15.6c1.8-1.4 3.5-1.4 5.2 0s3.4 1.4 5.2 0 3.4-1.4 5.2 0" stroke="#EA580C" stroke-width="2.0" stroke-linecap="round"/>
+  <path d="M4.2 19.8c1.8-1.4 3.5-1.4 5.2 0s3.4 1.4 5.2 0 3.4-1.4 5.2 0" stroke="#0284C7" stroke-width="2.0" stroke-linecap="round"/>
+</svg>
+''';
+
+  /// Recharge électrique (Borne VE) multicolore : borne teal + éclair or + câble
+  static const String colorEvCharger = '''
+<svg viewBox="0 0 24 24" fill="none">
+  <rect x="3.8" y="3.2" width="11.2" height="17.6" rx="2.6" fill="#14B8A6" stroke="#115E59" stroke-width="1.7"/>
+  <rect x="5.8" y="5.4" width="7.2" height="4.2" rx="1.1" fill="#CCFBF1"/>
+  <path d="M15 9.2h1.8a1.7 1.7 0 0 1 1.7 1.7v5.9a1.5 1.5 0 0 0 3 0V8.4L19 5.8" stroke="#0F766E" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="19" cy="5.8" r="1.2" fill="#0284C7"/>
+  <path d="M10.4 11.4l-2.4 3.6h2.6l-1.4 3.3 3.4-4.2H10l0.4-2.7z" fill="#FDE047" stroke="#B45309" stroke-width="0.9" stroke-linejoin="round"/>
+</svg>
+''';
+
   // ==========================================
   // BARRE DE NAVIGATION INFÉRIEURE (Style iOS)
   // ==========================================
@@ -157,6 +260,13 @@ class AppVectorIcons {
   static const String sparkle = '''
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
   <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z"/>
+</svg>
+''';
+
+  /// Logo vectoriel WhatsApp épuré
+  static const String whatsapp = '''
+<svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd">
+  <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2zm5.82 14.12c-.24.68-1.42 1.3-1.97 1.38-.51.07-1.15.1-1.85-.12-.43-.14-.98-.32-1.69-.63-2.97-1.28-4.91-4.27-5.06-4.47-.15-.2-1.21-1.61-1.21-3.07s.77-2.18 1.04-2.48c.27-.3.6-.37.8-.37h.58c.19 0 .44-.07.69.52.26.62.88 2.14.96 2.3.08.16.13.34.03.54-.1.2-.15.32-.3.5-.15.17-.31.38-.44.51-.15.15-.3.31-.13.61.17.3.77 1.27 1.65 2.05 1.13 1.01 2.09 1.32 2.39 1.47.3.15.48.13.66-.07.18-.2.75-.87.95-1.17.2-.3.4-.25.67-.15.27.1 1.74.82 2.04.97.3.15.5.22.57.34.07.12.07.7-.17 1.38z"/>
 </svg>
 ''';
 

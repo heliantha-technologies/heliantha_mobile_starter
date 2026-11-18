@@ -61,6 +61,7 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
     super.key,
     required this.subtitle,
     this.showBack = false,
+    this.backEnabled = true,
     this.showCart = true,
     this.actions = const [],
     this.backFallbackLocation,
@@ -68,6 +69,7 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
 
   final String subtitle;
   final bool showBack;
+  final bool backEnabled;
   final bool showCart;
   final List<Widget> actions;
   final String? backFallbackLocation;
@@ -86,16 +88,18 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
       leading: showBack
           ? IconButton(
               tooltip: 'Retour',
-              onPressed: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  final fallback = backFallbackLocation;
-                  if (fallback != null) {
-                    context.go(fallback);
-                  }
-                }
-              },
+              onPressed: backEnabled
+                  ? () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        final fallback = backFallbackLocation;
+                        if (fallback != null) {
+                          context.go(fallback);
+                        }
+                      }
+                    }
+                  : null,
               icon: const Icon(Icons.arrow_back_rounded),
             )
           : null,

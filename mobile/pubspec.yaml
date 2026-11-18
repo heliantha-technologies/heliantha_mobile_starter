@@ -36,4 +36,10 @@ flutter:
     - assets/brand/helin.jpeg
     - assets/brand/fond_arriere_plan.png
     - assets/brand/solar_ios_bg.jpg
+    - assets/categories/cat_panneaux.jpg
+    - assets/categories/cat_onduleurs.jpg
+    - assets/categories/cat_batteries.jpg
+    - assets/categories/cat_pompage.jpg
+    - assets/categories/cat_coffrets.jpg
+    - assets/categories/cat_eclairage.jpg
     - assets/docs/RIB CIH Heliantha (1).pdf

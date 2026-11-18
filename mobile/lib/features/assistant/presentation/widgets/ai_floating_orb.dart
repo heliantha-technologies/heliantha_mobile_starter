@@ -47,6 +47,9 @@ class _AiFloatingOrbState extends State<AiFloatingOrb>
   // Positionnement libre en pixels
   double? _x;
   double? _y;
+  bool _hasCustomPosition = false;
+  bool _anchoredRight = true;
+  double? _bottomOffset;
   bool _isDragging = false;
   double _dragDistance = 0.0;
 
@@ -125,13 +128,15 @@ class _AiFloatingOrbState extends State<AiFloatingOrb>
   }
 
   /// Aimante doucement le bouton vers le bord gauche ou droit le plus proche
-  void _snapToNearestEdge(double parentWidth) {
+  void _snapToNearestEdge(double parentWidth, double parentHeight) {
     if (_x == null) return;
 
     final middle = parentWidth / 2.0;
-    final targetX = (_x! + _orbSize / 2.0 < middle)
-        ? 14.0
-        : (parentWidth - _orbSize - 14.0);
+    final snapLeft = _x! + _orbSize / 2.0 < middle;
+    _anchoredRight = !snapLeft;
+    _bottomOffset = (parentHeight - _orbSize - (_y ?? 0.0))
+        .clamp(8.0, math.max(8.0, parentHeight - _orbSize - 8.0));
+    final targetX = snapLeft ? 14.0 : (parentWidth - _orbSize - 14.0);
 
     _snapAnimation = Tween<double>(begin: _x!, end: targetX).animate(
       CurvedAnimation(
@@ -148,12 +153,16 @@ class _AiFloatingOrbState extends State<AiFloatingOrb>
       builder: (context, constraints) {
         final parentWidth = constraints.maxWidth;
         final parentHeight = constraints.maxHeight;
+        final defaultBottom = widget.initialBottomMargin ?? 22.0;
 
-        // Initialisation de la position par défaut (en bas à droite)
-        if (_x == null || _y == null) {
+        // Garde l'orbe ancré au bord lors d'un redimensionnement fenêtre/orientation.
+        if (_x == null || _y == null || !_hasCustomPosition) {
           _x = parentWidth - _orbSize - 16.0;
-          final bottomMargin = widget.initialBottomMargin ?? 22.0;
-          _y = parentHeight - _orbSize - bottomMargin;
+          _y = parentHeight - _orbSize - defaultBottom;
+        } else if (!_isDragging && !_snapController.isAnimating) {
+          _x = _anchoredRight ? (parentWidth - _orbSize - 14.0) : 14.0;
+          final bottomOffset = _bottomOffset ?? defaultBottom;
+          _y = parentHeight - _orbSize - bottomOffset;
         }
 
         // Sécurisation dans les limites de l'écran
@@ -166,40 +175,43 @@ class _AiFloatingOrbState extends State<AiFloatingOrb>
             Positioned(
               left: _x,
               top: _y,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onPanStart: (details) {
-                  _snapController.stop();
-                  _isDragging = true;
-                  _dragDistance = 0.0;
-                  HapticFeedback.selectionClick();
-                  setState(() {});
-                },
-                onPanUpdate: (details) {
-                  _dragDistance += details.delta.distance;
-                  setState(() {
-                    _x = (_x! + details.delta.dx).clamp(
-                      8.0,
-                      parentWidth - _orbSize - 8.0,
-                    );
-                    _y = (_y! + details.delta.dy).clamp(
-                      8.0,
-                      parentHeight - _orbSize - 8.0,
-                    );
-                  });
-                },
-                onPanEnd: (details) {
-                  _isDragging = false;
-                  setState(() {});
-                  // Si l'utilisateur n'a fait qu'un tap rapide (< 6 px)
-                  if (_dragDistance < 6.0) {
-                    _openChat();
-                  } else {
-                    _snapToNearestEdge(parentWidth);
-                  }
-                },
-                onTap: _openChat,
-                child: AnimatedScale(
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onPanStart: (details) {
+                    _snapController.stop();
+                    _isDragging = true;
+                    _dragDistance = 0.0;
+                    HapticFeedback.selectionClick();
+                    setState(() {});
+                  },
+                  onPanUpdate: (details) {
+                    _dragDistance += details.delta.distance;
+                    _hasCustomPosition = true;
+                    setState(() {
+                      _x = (_x! + details.delta.dx).clamp(
+                        8.0,
+                        parentWidth - _orbSize - 8.0,
+                      );
+                      _y = (_y! + details.delta.dy).clamp(
+                        8.0,
+                        parentHeight - _orbSize - 8.0,
+                      );
+                    });
+                  },
+                  onPanEnd: (details) {
+                    _isDragging = false;
+                    setState(() {});
+                    // Si l'utilisateur n'a fait qu'un tap rapide (< 6 px)
+                    if (_dragDistance < 6.0) {
+                      _openChat();
+                    } else {
+                      _snapToNearestEdge(parentWidth, parentHeight);
+                    }
+                  },
+                  onTap: _openChat,
+                  child: AnimatedScale(
                   scale: _isDragging ? 1.08 : 1.0,
                   duration: const Duration(milliseconds: 140),
                   curve: Curves.easeOutCubic,
@@ -357,6 +369,7 @@ class _AiFloatingOrbState extends State<AiFloatingOrb>
                     },
                   ),
                 ),
+              ),
               ),
             ),
           ],

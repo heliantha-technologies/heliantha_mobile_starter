@@ -314,4 +314,47 @@ void main() {
         {'q': 'eclairage'});
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+      'Nos Univers Solaires displays 6 real category asset images without enlarging card height',
+      (tester) async {
+    final router = _testRouter();
+    await _mountNavigationHome(tester, router);
+
+    final gridFinder = find.byType(GridView);
+    final images = tester
+        .widgetList<Image>(
+          find.descendant(of: gridFinder, matching: find.byType(Image)),
+        )
+        .toList();
+    expect(images, hasLength(6));
+
+    final assetNames = images
+        .map((img) => (img.image as AssetImage).assetName)
+        .toList();
+    expect(assetNames, const [
+      'assets/categories/cat_panneaux.jpg',
+      'assets/categories/cat_onduleurs.jpg',
+      'assets/categories/cat_batteries.jpg',
+      'assets/categories/cat_pompage.jpg',
+      'assets/categories/cat_coffrets.jpg',
+      'assets/categories/cat_eclairage.jpg',
+    ]);
+
+    final cardInkWells = find.descendant(
+      of: gridFinder,
+      matching: find.byType(InkWell),
+    );
+    expect(cardInkWells, findsNWidgets(6));
+    for (var i = 0; i < 6; i++) {
+      expect(tester.getSize(cardInkWells.at(i)).height, 118.0);
+    }
+
+    tester.view.physicalSize = const Size(1280, 800);
+    await tester.pump();
+    for (var i = 0; i < 6; i++) {
+      expect(tester.getSize(cardInkWells.at(i)).height, 134.0);
+    }
+    expect(tester.takeException(), isNull);
+  });
 }

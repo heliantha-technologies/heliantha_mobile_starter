@@ -33,6 +33,15 @@ void main() {
         AppVectorIcons.pump,
         AppVectorIcons.shieldBreaker,
         AppVectorIcons.solarLighting,
+        AppVectorIcons.offGridHome,
+        AppVectorIcons.solarThermal,
+        AppVectorIcons.evCharger,
+        AppVectorIcons.colorPump,
+        AppVectorIcons.colorOffGridHome,
+        AppVectorIcons.colorSolarPanel,
+        AppVectorIcons.colorBattery,
+        AppVectorIcons.colorSolarThermal,
+        AppVectorIcons.colorEvCharger,
         AppVectorIcons.navHome,
         AppVectorIcons.navHomeFilled,
         AppVectorIcons.navCatalog,
@@ -43,6 +52,7 @@ void main() {
         AppVectorIcons.navAccountFilled,
         AppVectorIcons.arrowForward,
         AppVectorIcons.sparkle,
+        AppVectorIcons.whatsapp,
         AppVectorIcons.logoSun,
       ];
 

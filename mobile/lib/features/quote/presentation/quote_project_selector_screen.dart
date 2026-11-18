@@ -1,25 +1,35 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../shared/widgets/app_background.dart';
+import '../../../shared/theme/app_vector_icons.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/brand_widgets.dart';
 import '../../assistant/presentation/widgets/ai_floating_orb.dart';
+import 'widgets/solar_system_3d_background.dart';
 
-class QuoteProjectSelectorScreen extends StatelessWidget {
+class QuoteProjectSelectorScreen extends StatefulWidget {
   const QuoteProjectSelectorScreen({super.key});
 
-  static const _projects = [
+  @override
+  State<QuoteProjectSelectorScreen> createState() =>
+      _QuoteProjectSelectorScreenState();
+}
+
+class _QuoteProjectSelectorScreenState
+    extends State<QuoteProjectSelectorScreen> {
+  static const _projects = <_QuoteProject>[
     _QuoteProject(
       title: 'Pompage solaire',
-      description: 'Forage & irrigation continue',
-      buttonLabel: 'Estimer mon pompage →',
-      emoji: '💧',
-      accentColor: Color(0xFF0284C7),
-      accentBg: Color(0xFFE0F2FE),
+      tag: 'Irrigation',
+      description: 'Forage, bassin & irrigation continue',
+      metaLabel: 'Débit / HMT ou puissance CV',
+      buttonLabel: 'Estimer mon pompage',
+      svgIcon: AppVectorIcons.colorPump,
+      accentColor: Color(0xFF0A6097),
+      tintBackground: Color(0xFFE0F2FE),
+      iconGradient: [Color(0xFFE0F2FE), Color(0xFFBAE6FD)],
       projectType: 'pompage',
       enabled: true,
     ),
@@ -27,55 +37,71 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
       title: 'Site sans réseau',
       tag: 'Off-Grid',
       description: 'Autonomie électrique totale',
-      buttonLabel: '⏳ Bientôt disponible',
-      emoji: '🏠',
-      accentColor: Color(0xFF64748B),
-      accentBg: Color(0xFFF1F5F9),
+      metaLabel: 'Sites isolés & refuges',
+      buttonLabel: 'Bientôt disponible',
+      svgIcon: AppVectorIcons.colorOffGridHome,
+      accentColor: Color(0xFF4338CA),
+      tintBackground: Color(0xFFE0E7FF),
+      iconGradient: [Color(0xFFE0E7FF), Color(0xFFC7D2FE)],
       enabled: false,
     ),
     _QuoteProject(
       title: 'Réduire ma facture',
       tag: 'Photovoltaïque',
-      description: 'Autoconsommation & économie',
-      buttonLabel: 'Estimer mes économies →',
-      emoji: '☀️',
-      accentColor: Color(0xFFD97706),
-      accentBg: Color(0xFFFEF3C7),
+      description: 'Autoconsommation & économies',
+      metaLabel: 'Compteur, réseau & kWc',
+      buttonLabel: 'Estimer mes économies',
+      svgIcon: AppVectorIcons.colorSolarPanel,
+      accentColor: Color(0xFFB45309),
+      tintBackground: Color(0xFFFEF3C7),
+      iconGradient: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
       projectType: 'autoconsommation',
       enabled: true,
+      featured: true,
     ),
     _QuoteProject(
       title: 'Solaire avec batteries',
-      tag: 'Hybride',
-      description: 'Stockage Lithium 24/7',
-      buttonLabel: 'Estimer mon installation →',
-      emoji: '🔋',
-      accentColor: Color(0xFF16A34A),
-      accentBg: Color(0xFFDCFCE7),
+      tag: 'Hybride 24/7',
+      description: 'Stockage Lithium jour & nuit',
+      metaLabel: 'Autonomie & secours coupures',
+      buttonLabel: 'Estimer mon installation',
+      svgIcon: AppVectorIcons.colorBattery,
+      accentColor: Color(0xFF047857),
+      tintBackground: Color(0xFFD1FAE5),
+      iconGradient: [Color(0xFFD1FAE5), Color(0xFFA7F3D0)],
       projectType: 'hybride',
       enabled: true,
     ),
     _QuoteProject(
       title: 'Chauffage solaire',
+      tag: 'Thermique',
       description: 'Eau chaude sanitaire solaire',
-      buttonLabel: '⏳ Bientôt disponible',
-      emoji: '♨️',
-      accentColor: Color(0xFF64748B),
-      accentBg: Color(0xFFF1F5F9),
+      metaLabel: 'Chauffe-eau & collectif',
+      buttonLabel: 'Bientôt disponible',
+      svgIcon: AppVectorIcons.colorSolarThermal,
+      accentColor: Color(0xFFC2410C),
+      tintBackground: Color(0xFFFFEDD5),
+      iconGradient: [Color(0xFFFFEDD5), Color(0xFFFED7AA)],
       enabled: false,
     ),
     _QuoteProject(
       title: 'Recharge électrique',
+      tag: 'Borne VE',
       description: 'Borne pour véhicule électrique',
-      buttonLabel: '⏳ Bientôt disponible',
-      emoji: '🚗',
-      accentColor: Color(0xFF64748B),
-      accentBg: Color(0xFFF1F5F9),
+      metaLabel: 'Recharge solaire dédiée',
+      buttonLabel: 'Bientôt disponible',
+      svgIcon: AppVectorIcons.colorEvCharger,
+      accentColor: Color(0xFF0F766E),
+      tintBackground: Color(0xFFCCFBF1),
+      iconGradient: [Color(0xFFCCFBF1), Color(0xFF99F6E4)],
       enabled: false,
     ),
   ];
 
-  static void _openProject(BuildContext context, _QuoteProject project) {
+  Offset _tiltOffset = Offset.zero;
+  Color? _focusColor;
+
+  void _openProject(BuildContext context, _QuoteProject project) {
     if (!project.enabled || project.projectType == null) {
       AppFeedback.info(
         context,
@@ -89,464 +115,776 @@ class QuoteProjectSelectorScreen extends StatelessWidget {
     );
   }
 
+  void _updateParallax(Offset localPosition, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+    final nx = ((localPosition.dx / size.width) - 0.5) * 2.0;
+    final ny = ((localPosition.dy / size.height) - 0.5) * 2.0;
+    final clamped = Offset(nx.clamp(-1.0, 1.0), ny.clamp(-1.0, 1.0));
+    if ((clamped - _tiltOffset).distance > 0.03) {
+      setState(() => _tiltOffset = clamped);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const AppTopBar(
         subtitle: 'Étude • Installation • Maintenance',
       ),
-      body: Stack(
-        children: [
-          // 1. Image d'arrière-plan haute définition : panneaux photovoltaïques purs & ciel bleu
-          Positioned.fill(
-            child: Image.asset(
-              helianthaSolarIosBackgroundAsset,
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-            ),
-          ),
-          // 2. Léger filtre lumineux pour sublimer les reflets de verre givré
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.08),
-                    Colors.transparent,
-                    const Color(0xFFFED7AA).withValues(alpha: 0.12),
-                  ],
-                  stops: const [0.0, 0.45, 1.0],
+      body: LayoutBuilder(
+        builder: (context, rootConstraints) {
+          final viewportSize = rootConstraints.biggest;
+          return MouseRegion(
+            onHover: (event) => _updateParallax(event.localPosition, viewportSize),
+            onExit: (_) {
+              if (_tiltOffset != Offset.zero || _focusColor != null) {
+                setState(() {
+                  _tiltOffset = Offset.zero;
+                  _focusColor = null;
+                });
+              }
+            },
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: SolarSystem3DBackground(
+                    tiltOffset: _tiltOffset,
+                    focusColor: _focusColor,
+                  ),
                 ),
-              ),
-            ),
-          ),
-          // 3. Grille des cartes avec dimensionnement dynamique 100% sans scroll
-          Positioned.fill(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                final height = constraints.maxHeight;
+                Positioned.fill(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = constraints.maxWidth;
+                      final height = constraints.maxHeight;
+                      final textScale =
+                          MediaQuery.textScalerOf(context).scale(14) / 14;
 
-                final isWide = width >= 700;
-                final crossAxisCount = isWide ? 3 : 2;
-                final rowCount = (_projects.length / crossAxisCount).ceil(); // 2 sur PC/tablette, 3 sur mobile
-                final horizontalPadding = isWide ? 20.0 : 10.0;
-                final gap = isWide ? 10.0 : 7.0;
+                      final isDesktop = width >= 760;
+                      final crossAxisCount = isDesktop ? 3 : 2;
+                      final rowCount = (_projects.length / crossAxisCount).ceil();
+                      final maxContainerWidth = isDesktop ? 1040.0 : width;
+                      final horizontalPadding = isDesktop ? 24.0 : 12.0;
+                      final gap = isDesktop ? 16.0 : 9.0;
+                      final topPadding = isDesktop ? 16.0 : 8.0;
+                      final heroHeight = (isDesktop ? 70.0 : 58.0) +
+                          (textScale - 1.0).clamp(0.0, 1.0) * 18.0;
+                      final heroGap = isDesktop ? 14.0 : 8.0;
 
-                // Calcul de la largeur réelle par colonne
-                final containerMaxWidth = isWide ? 960.0 : width;
-                final effectiveWidth =
-                    math.min(width, containerMaxWidth) - (horizontalPadding * 2);
-                final colWidth =
-                    (effectiveWidth - (gap * (crossAxisCount - 1))) /
-                        crossAxisCount;
+                      // Réserve un espace bas pour éviter que l'orbe IA recouvre la 6e carte sur mobile.
+                      final double bottomPadding;
+                      if (isDesktop) {
+                        bottomPadding = 22.0;
+                      } else if (height >= 640) {
+                        bottomPadding = 68.0;
+                      } else {
+                        bottomPadding = 10.0;
+                      }
 
-                // Hauteur dynamique allouée aux cartes pour tenir EXACTEMENT sur 1 seul écran
-                final fixedVertical = isWide ? 76.0 : 66.0;
-                final totalGaps = gap * (rowCount - 1);
-                final availableForGrid = height - fixedVertical - totalGaps;
-                final targetCardHeight =
-                    (availableForGrid / rowCount).clamp(118.0, 190.0);
-                final childAspectRatio = colWidth / targetCardHeight;
+                      final effectiveWidth =
+                          math.min(width, maxContainerWidth) -
+                              (horizontalPadding * 2);
+                      final colWidth =
+                          (effectiveWidth - (gap * (crossAxisCount - 1))) /
+                              crossAxisCount;
 
-                // Détecte si les cartes doivent être en mode compact
-                final isCompact = targetCardHeight < 152.0;
+                      final totalGaps = gap * (rowCount - 1);
+                      final availableForGrid = height -
+                          topPadding -
+                          heroHeight -
+                          heroGap -
+                          totalGaps -
+                          bottomPadding;
 
-                final content = Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    horizontalPadding,
-                    isWide ? 10.0 : 6.0,
-                    horizontalPadding,
-                    isWide ? 10.0 : 6.0,
-                  ),
-                  child: Column(
-                    children: [
-                      const _QuoteHero(),
-                      SizedBox(height: isWide ? 10.0 : 6.0),
-                      Expanded(
-                        child: GridView.builder(
-                          physics: height < 400
-                              ? const ClampingScrollPhysics()
-                              : const NeverScrollableScrollPhysics(),
-                          itemCount: _projects.length,
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: gap,
-                            mainAxisSpacing: gap,
-                            childAspectRatio: childAspectRatio,
-                          ),
-                          itemBuilder: (context, index) {
-                            final project = _projects[index];
-                            return _ProjectCard(
-                              project: project,
-                              isCompact: isCompact,
-                              onTap: () => _openProject(context, project),
-                            );
-                          },
+                      final minComfortHeight = (isDesktop ? 185.0 : 132.0) +
+                          (textScale - 1.0).clamp(0.0, 1.0) * 86.0;
+                      final maxCardHeight = isDesktop ? 250.0 : 210.0;
+                      final rawCardHeight = availableForGrid / rowCount;
+                      final needsScroll = rawCardHeight < minComfortHeight;
+                      final targetCardHeight = rawCardHeight.clamp(
+                        minComfortHeight,
+                        maxCardHeight,
+                      );
+                      final childAspectRatio =
+                          math.max(0.5, colWidth / targetCardHeight);
+
+                      final isCompact = targetCardHeight < 156.0 ||
+                          (textScale > 1.15 && targetCardHeight < 178.0);
+                      final isSpacious = targetCardHeight >= 215.0;
+
+                      final grid = GridView.builder(
+                        shrinkWrap: needsScroll,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _projects.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: gap,
+                          mainAxisSpacing: gap,
+                          childAspectRatio: childAspectRatio,
                         ),
-                      ),
-                    ],
+                        itemBuilder: (context, index) {
+                          final project = _projects[index];
+                          return _ProjectExecutiveCard(
+                            project: project,
+                            isCompact: isCompact,
+                            isSpacious: isSpacious,
+                            onTap: () => _openProject(context, project),
+                            onHoverChanged: (hovered) {
+                              if (!project.enabled) return;
+                              final next = hovered ? project.accentColor : null;
+                              if (_focusColor != next) {
+                                setState(() => _focusColor = next);
+                              }
+                            },
+                          );
+                        },
+                      );
+
+                      final innerColumn = Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize:
+                            needsScroll ? MainAxisSize.min : MainAxisSize.max,
+                        children: [
+                          SizedBox(
+                            height: heroHeight,
+                            child: _QuoteHero(isDesktop: isDesktop),
+                          ),
+                          SizedBox(height: heroGap),
+                          if (needsScroll) grid else Expanded(child: grid),
+                        ],
+                      );
+
+                      final padded = Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          topPadding,
+                          horizontalPadding,
+                          needsScroll && !isDesktop ? 82.0 : bottomPadding,
+                        ),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: maxContainerWidth,
+                            ),
+                            child: innerColumn,
+                          ),
+                        ),
+                      );
+
+                      if (needsScroll) {
+                        return SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          child: padded,
+                        );
+                      }
+
+                      return padded;
+                    },
                   ),
-                );
-
-                if (isWide) {
-                  return Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 960),
-                      child: content,
-                    ),
-                  );
-                }
-
-                return content;
-              },
+                ),
+                Positioned.fill(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final bottomMargin = constraints.maxHeight >= 640 &&
+                              constraints.maxWidth < 760
+                          ? 8.0
+                          : 18.0;
+                      return AiFloatingOrb(
+                        initialBottomMargin: bottomMargin,
+                        contextPrompt:
+                            'Le client consulte la sélection des projets solaires Heliantha Maroc (Pompage solaire, Autoconsommation photovoltaïque, Système solaire hybride avec batteries). Aide-le à choisir la solution solaire adaptée à ses besoins énergétiques.',
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ),
-          // 4. Orbe IA flottant déplaçable avec clignotement de présence
-          const Positioned.fill(
-            child: AiFloatingOrb(
-              initialBottomMargin: 20.0,
-              contextPrompt:
-                  'Le client consulte la sélection des projets solaires Heliantha Maroc (Pompage solaire, Autoconsommation photovoltaïque, Système solaire hybride avec batteries). Aide-le à choisir la solution solaire adaptée à ses besoins énergétiques.',
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
 class _QuoteHero extends StatelessWidget {
-  const _QuoteHero();
+  const _QuoteHero({required this.isDesktop});
+
+  final bool isDesktop;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.86),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.white,
-              width: 1.1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0B2239),
+            Color(0xFF13355B),
+          ],
+        ),
+        border: Border.all(
+          color: const Color(0xFFF4C33D).withValues(alpha: 0.55),
+          width: 1.15,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0B2239).withValues(alpha: 0.16),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
-          child: Row(
-            children: [
-              const HelianthaLogo(
-                size: 32,
-                padding: 2,
-                showShadow: true,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Quel est votre projet ?',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: const Color(0xFF0F172A),
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14.5,
-                            letterSpacing: -0.3,
-                          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              top: -28,
+              right: -20,
+              child: IgnorePointer(
+                child: Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFFF4C33D).withValues(alpha: 0.22),
+                        const Color(0xFFF4C33D).withValues(alpha: 0.0),
+                      ],
                     ),
-                    const SizedBox(height: 1),
-                    Text(
-                      'Choisissez votre solution solaire.',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: const Color(0xFF64748B),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11.0,
-                          ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 20 : 12,
+                vertical: isDesktop ? 10 : 6,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: isDesktop ? 40 : 34,
+                    height: isDesktop ? 40 : 34,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF4C33D).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(isDesktop ? 12 : 10),
+                      border: Border.all(
+                        color: const Color(0xFFF4C33D).withValues(alpha: 0.55),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: AppSvgIcon(
+                      AppVectorIcons.sparkle,
+                      color: const Color(0xFFF4C33D),
+                      size: isDesktop ? 19 : 17,
+                    ),
+                  ),
+                  SizedBox(width: isDesktop ? 14 : 10),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Quel est votre projet ?',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: isDesktop ? 18.0 : 15.0,
+                            letterSpacing: -0.3,
+                            height: 1.15,
+                          ),
+                        ),
+                        const SizedBox(height: 1.5),
+                        Text(
+                          'Choisissez votre solution solaire.',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: const Color(0xFFCBD5E1),
+                            fontWeight: FontWeight.w500,
+                            fontSize: isDesktop ? 12.5 : 11.0,
+                            height: 1.15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isDesktop ? 180 : 108,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isDesktop ? 12 : 9,
+                          vertical: isDesktop ? 6 : 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF4C33D),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          isDesktop
+                              ? 'Gratuit · 2 min · PDF'
+                              : 'Offert · 2 min',
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: const Color(0xFF0B2239),
+                            fontWeight: FontWeight.w900,
+                            fontSize: isDesktop ? 11.5 : 10.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _ProjectCard extends StatefulWidget {
-  const _ProjectCard({
+class _ProjectExecutiveCard extends StatefulWidget {
+  const _ProjectExecutiveCard({
     required this.project,
     required this.onTap,
+    required this.onHoverChanged,
     this.isCompact = false,
+    this.isSpacious = false,
   });
 
   final _QuoteProject project;
   final VoidCallback onTap;
+  final ValueChanged<bool> onHoverChanged;
   final bool isCompact;
+  final bool isSpacious;
 
   @override
-  State<_ProjectCard> createState() => _ProjectCardState();
+  State<_ProjectExecutiveCard> createState() => _ProjectExecutiveCardState();
 }
 
-class _ProjectCardState extends State<_ProjectCard> {
+class _ProjectExecutiveCardState extends State<_ProjectExecutiveCard> {
+  bool _hovered = false;
   bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
     final project = widget.project;
     final isCompact = widget.isCompact;
+    final isSpacious = widget.isSpacious;
+    final active = _hovered || _pressed;
+    final borderRadius = BorderRadius.circular(isCompact ? 16 : 18);
 
-    return AnimatedScale(
-      scale: _pressed ? 0.97 : 1.0,
-      duration: const Duration(milliseconds: 120),
-      curve: Curves.easeOutCubic,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
+    final accent = project.accentColor;
+    final tintBg = project.tintBackground;
+    final borderColor = project.enabled
+        ? (project.featured
+            ? const Color(0xFFE5A93C).withValues(alpha: active ? 1.0 : 0.88)
+            : accent.withValues(alpha: active ? 0.68 : 0.36))
+        : const Color(0xFFCBD5E1).withValues(alpha: active ? 0.98 : 0.85);
+
+    final bgColors = project.enabled
+        ? [
+            Colors.white.withValues(alpha: active ? 0.94 : 0.82),
+            const Color(0xFFF8FBFF).withValues(alpha: active ? 0.97 : 0.87),
+          ]
+        : [
+            const Color(0xFFF8FAFC).withValues(alpha: active ? 0.85 : 0.76),
+            const Color(0xFFF1F5F9).withValues(alpha: active ? 0.90 : 0.82),
+          ];
+
+    return Semantics(
+      button: true,
+      label: '${project.title} - ${project.buttonLabel}',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) {
+          setState(() => _hovered = true);
+          widget.onHoverChanged(true);
+        },
+        onExit: (_) {
+          setState(() {
+            _hovered = false;
+            _pressed = false;
+          });
+          widget.onHoverChanged(false);
+        },
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : (_hovered && project.enabled ? 1.015 : 1.0),
+          duration: const Duration(milliseconds: 130),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 170),
+            curve: Curves.easeOutCubic,
             decoration: BoxDecoration(
-              color: project.enabled
-                  ? Colors.white.withValues(alpha: 0.86)
-                  : Colors.white.withValues(alpha: 0.78),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: borderRadius,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: bgColors,
+              ),
               border: Border.all(
-                color: Colors.white,
-                width: 1.1,
+                color: borderColor,
+                width: active ? 1.50 : 1.20,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: const Color(0xFF0B2239).withValues(
+                    alpha: project.enabled
+                        ? (active ? 0.16 : 0.10)
+                        : (active ? 0.08 : 0.04),
+                  ),
+                  blurRadius: project.enabled ? (active ? 22 : 18) : 10,
+                  offset: Offset(
+                    0,
+                    project.enabled ? (active ? 9 : 7) : 4,
+                  ),
                 ),
-                if (project.enabled)
+                if (project.featured)
                   BoxShadow(
-                    color: project.accentColor.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: const Color(0xFFF4C33D).withValues(
+                      alpha: active ? 0.28 : 0.18,
+                    ),
+                    blurRadius: active ? 20 : 16,
+                    offset: const Offset(0, 3),
+                  )
+                else if (project.enabled && active)
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.16),
+                    blurRadius: 16,
+                    offset: const Offset(0, 3),
                   ),
               ],
             ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: widget.onTap,
-                onTapDown: (_) => setState(() => _pressed = true),
-                onTapUp: (_) => setState(() => _pressed = false),
-                onTapCancel: () => setState(() => _pressed = false),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isCompact ? 8.0 : 10.0,
-                    vertical: isCompact ? 6.5 : 9.0,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 1. Pastille compacte + Tag flexible
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            width: isCompact ? 32 : 36,
-                            height: isCompact ? 32 : 36,
-                            decoration: BoxDecoration(
-                              color: project.accentBg,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: project.accentColor
-                                    .withValues(alpha: 0.30),
-                                width: 0.9,
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              project.emoji,
-                              style: TextStyle(
-                                fontSize: isCompact ? 16.5 : 19.0,
-                              ),
-                            ),
+            child: ClipRRect(
+              borderRadius: borderRadius,
+              child: Stack(
+                children: [
+                  // Reflet spéculaire léger sans BackdropFilter (60 FPS garantis)
+                  const Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0x28FFFFFF),
+                              Color(0x06FFFFFF),
+                              Color(0x00FFFFFF),
+                            ],
+                            stops: [0.0, 0.35, 0.7],
                           ),
-                          if (project.tag != null)
-                            Flexible(
-                              child: Container(
-                                margin: const EdgeInsets.only(left: 4),
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: isCompact ? 6 : 7,
-                                  vertical: isCompact ? 2.0 : 2.5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: project.accentBg
-                                      .withValues(alpha: 0.95),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: project.accentColor
-                                        .withValues(alpha: 0.35),
-                                    width: 0.8,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: borderRadius,
+                      onTap: widget.onTap,
+                      onHighlightChanged: (value) =>
+                          setState(() => _pressed = value),
+                      splashColor: accent.withValues(alpha: 0.10),
+                      highlightColor: accent.withValues(alpha: 0.05),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal:
+                              isSpacious ? 16.0 : (isCompact ? 9.0 : 11.5),
+                          vertical:
+                              isSpacious ? 15.0 : (isCompact ? 8.0 : 10.5),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 1. Médaillon SVG + Tag domaine
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  width:
+                                      isSpacious ? 46 : (isCompact ? 34 : 38),
+                                  height:
+                                      isSpacious ? 46 : (isCompact ? 34 : 38),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: project.iconGradient,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      isSpacious ? 13 : (isCompact ? 10 : 12),
+                                    ),
+                                    border: Border.all(
+                                      color: accent.withValues(
+                                        alpha: project.enabled ? 0.36 : 0.28,
+                                      ),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: accent.withValues(alpha: 0.14),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: AppSvgIcon(
+                                    project.svgIcon,
+                                    size: isSpacious
+                                        ? 25
+                                        : (isCompact ? 19.0 : 21.5),
                                   ),
                                 ),
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    project.tag!,
-                                    maxLines: 1,
-                                    style: TextStyle(
-                                      color: project.accentColor,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: isCompact ? 9.0 : 9.5,
-                                      letterSpacing: 0.1,
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: isSpacious ? 9 : 7,
+                                      vertical: isSpacious ? 3.5 : 2.5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: tintBg,
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(
+                                        color: accent.withValues(
+                                          alpha: project.enabled ? 0.34 : 0.24,
+                                        ),
+                                        width: 0.9,
+                                      ),
+                                    ),
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        project.tag,
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          color: accent,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: isSpacious
+                                              ? 10.5
+                                              : (isCompact ? 8.8 : 9.5),
+                                          letterSpacing: 0.1,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      SizedBox(height: isCompact ? 4 : 5),
-
-                      // 2. Section Titre
-                      Text(
-                        project.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: const Color(0xFF0F172A),
-                          fontWeight: FontWeight.w800,
-                          fontSize: isCompact ? 12.8 : 13.8,
-                          letterSpacing: -0.2,
-                          height: 1.15,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-
-                      // 3. Section Description
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.topLeft,
-                          child: Text(
-                            project.description,
-                            maxLines: isCompact ? 1 : 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: const Color(0xFF475569).withValues(
-                                alpha: project.enabled ? 1.0 : 0.85,
-                              ),
-                              fontWeight: FontWeight.w500,
-                              fontSize: isCompact ? 9.8 : 10.5,
-                              height: 1.2,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(height: isCompact ? 3 : 5),
-
-                      // 4. Bouton d'action calibré
-                      if (project.enabled)
-                        Container(
-                          width: double.infinity,
-                          height: isCompact ? 28.0 : 32.0,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                            ),
-                            borderRadius: BorderRadius.circular(999),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF0F172A)
-                                    .withValues(alpha: 0.18),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1.5),
-                              ),
-                            ],
-                          ),
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  project.buttonLabel.replaceAll(' →', ''),
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: isCompact ? 10.5 : 11.2,
-                                    letterSpacing: -0.1,
-                                  ),
-                                ),
-                                const SizedBox(width: 3),
-                                Icon(
-                                  Icons.arrow_forward_rounded,
-                                  color: const Color(0xFFF59E0B),
-                                  size: isCompact ? 11.5 : 12.5,
-                                ),
                               ],
                             ),
-                          ),
-                        )
-                      else
-                        Container(
-                          width: double.infinity,
-                          height: isCompact ? 28.0 : 32.0,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE2E8F0)
-                                .withValues(alpha: 0.80),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.85),
-                              width: 0.8,
+
+                            // 2. Titre + description centrés verticalement
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    project.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: project.enabled
+                                          ? const Color(0xFF0B2239)
+                                          : const Color(0xFF334155),
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: isSpacious
+                                          ? 16.5
+                                          : (isCompact ? 13.0 : 14.0),
+                                      letterSpacing: -0.2,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                  SizedBox(height: isCompact ? 2 : 4),
+                                  Text(
+                                    project.description,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: project.enabled
+                                          ? const Color(0xFF475569)
+                                          : const Color(0xFF64748B),
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: isSpacious
+                                          ? 12.5
+                                          : (isCompact ? 10.2 : 11.0),
+                                      height: 1.24,
+                                    ),
+                                  ),
+                                  if (isSpacious) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          project.enabled
+                                              ? Icons.check_circle_rounded
+                                              : Icons.schedule_rounded,
+                                          size: 13.5,
+                                          color: project.enabled
+                                              ? accent
+                                              : const Color(0xFF94A3B8),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Expanded(
+                                          child: Text(
+                                            project.metaLabel,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: project.enabled
+                                                  ? const Color(0xFF334155)
+                                                  : const Color(0xFF64748B),
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 11.2,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
-                          ),
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.hourglass_top_rounded,
-                                  color: const Color(0xFF64748B),
-                                  size: isCompact ? 11.0 : 12.0,
+
+                            // 3. Bouton CTA plein haute visibilité aligné sur les 6 cartes
+                            if (project.enabled)
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 160),
+                                width: double.infinity,
+                                height: isSpacious
+                                    ? 38.0
+                                    : (isCompact ? 29.0 : 33.0),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(11),
+                                  gradient: LinearGradient(
+                                    colors: project.featured
+                                        ? (active
+                                            ? const [
+                                                Color(0xFFFDE047),
+                                                Color(0xFFF4C33D),
+                                              ]
+                                            : const [
+                                                Color(0xFFF4C33D),
+                                                Color(0xFFE5A93C),
+                                              ])
+                                        : (active
+                                            ? const [
+                                                Color(0xFF0E2C4A),
+                                                Color(0xFF183D73),
+                                              ]
+                                            : const [
+                                                Color(0xFF0B2239),
+                                                Color(0xFF132F5B),
+                                              ]),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (project.featured
+                                              ? const Color(0xFFE5A93C)
+                                              : const Color(0xFF0B2239))
+                                          .withValues(
+                                        alpha: active ? 0.34 : 0.22,
+                                      ),
+                                      blurRadius: active ? 11 : 8,
+                                      offset: Offset(0, active ? 4 : 3),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  project.buttonLabel.replaceAll('⏳ ', ''),
-                                  style: TextStyle(
-                                    color: const Color(0xFF64748B),
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: isCompact ? 10.0 : 10.8,
+                                alignment: Alignment.center,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        project.buttonLabel,
+                                        style: TextStyle(
+                                          color: project.featured
+                                              ? const Color(0xFF0B2239)
+                                              : Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: isSpacious
+                                              ? 12.4
+                                              : (isCompact ? 10.4 : 11.2),
+                                          letterSpacing: -0.1,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      AppSvgIcon(
+                                        AppVectorIcons.arrowForward,
+                                        color: project.featured
+                                            ? const Color(0xFF0B2239)
+                                            : const Color(0xFFF4C33D),
+                                        size: isSpacious ? 12.5 : 11.5,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
+                              )
+                            else
+                              Container(
+                                width: double.infinity,
+                                height: isSpacious
+                                    ? 38.0
+                                    : (isCompact ? 29.0 : 33.0),
+                                decoration: BoxDecoration(
+                                  color: active
+                                      ? const Color(0xFFD8E1EC)
+                                      : const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                alignment: Alignment.center,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.schedule_rounded,
+                                        color: const Color(0xFF475569),
+                                        size: isSpacious ? 13.5 : 12.0,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        project.buttonLabel,
+                                        style: TextStyle(
+                                          color: const Color(0xFF475569),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: isSpacious
+                                              ? 12.0
+                                              : (isCompact ? 10.0 : 10.8),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                    ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -559,23 +897,29 @@ class _ProjectCardState extends State<_ProjectCard> {
 class _QuoteProject {
   const _QuoteProject({
     required this.title,
+    required this.tag,
     required this.description,
+    required this.metaLabel,
     required this.buttonLabel,
-    required this.emoji,
+    required this.svgIcon,
     required this.accentColor,
-    required this.accentBg,
+    required this.tintBackground,
+    required this.iconGradient,
     required this.enabled,
-    this.tag,
     this.projectType,
+    this.featured = false,
   });
 
   final String title;
-  final String? tag;
+  final String tag;
   final String description;
+  final String metaLabel;
   final String buttonLabel;
-  final String emoji;
+  final String svgIcon;
   final Color accentColor;
-  final Color accentBg;
+  final Color tintBackground;
+  final List<Color> iconGradient;
   final bool enabled;
   final String? projectType;
+  final bool featured;
 }
