@@ -200,6 +200,10 @@ class _Shell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final isCompactMobile = mediaQuery.size.width < 600;
+    final minBottomSafePadding = isCompactMobile ? 10.0 : 0.0;
+
     return Scaffold(
       extendBody: false,
       resizeToAvoidBottomInset: false,
@@ -228,21 +232,24 @@ class _Shell extends StatelessWidget {
       bottomNavigationBar: Material(
         color: Theme.of(context).colorScheme.surface,
         elevation: 0,
-        child: SafeArea(
-          left: false,
-          right: false,
-          top: false,
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              border: Border(
-                top: BorderSide(color: AppColors.border),
-              ),
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: AppColors.border),
             ),
+          ),
+          child: SafeArea(
+            left: false,
+            right: false,
+            top: false,
+            maintainBottomViewPadding: true,
+            minimum: EdgeInsets.only(bottom: minBottomSafePadding),
             child: SizedBox(
-              height: 64,
+              height: 68,
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final navigationBar = NavigationBar(
+                    height: 68,
                     selectedIndex: shell.currentIndex,
                     onDestinationSelected: (index) {
                       shell.goBranch(
@@ -396,45 +403,64 @@ class _QuoteNavIconState extends State<_QuoteNavIcon>
   Widget build(BuildContext context) {
     final selected = widget.selected;
 
+    // Boîte de mise en page de 23 px de haut (identique aux 4 autres icônes) pour que
+    // le libellé "Devis" reste parfaitement aligné sur la même ligne et ne déborde jamais en bas.
     return Semantics(
       label: selected ? 'Devis actif' : 'Devis',
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected
-                ? const Color(0xFFF59E0B)
-                : const Color(0xFFCBD5E1).withValues(alpha: 0.35),
-            width: selected ? 1.6 : 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: selected
-                  ? const Color(0xFFF59E0B).withValues(alpha: 0.35)
-                  : const Color(0xFF0F172A).withValues(alpha: 0.16),
-              blurRadius: selected ? 12 : 6,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            final t = selected ? _controller.value : 0.0;
-            return CustomPaint(
-              size: const Size(26, 26),
-              painter: _NavOrbitalSunPainter(
-                spin: t,
-                pulse: selected ? (math.sin(t * 4 * math.pi) + 1) / 2 : 0.0,
-                selected: selected,
+      child: SizedBox(
+        width: 38,
+        height: 23,
+        child: OverflowBox(
+          minWidth: 34,
+          maxWidth: 34,
+          minHeight: 34,
+          maxHeight: 34,
+          alignment: Alignment.center,
+          child: Transform.translate(
+            offset: const Offset(0, -2),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: selected
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(17),
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFFCBD5E1).withValues(alpha: 0.35),
+                  width: selected ? 1.6 : 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: selected
+                        ? const Color(0xFFF59E0B).withValues(alpha: 0.35)
+                        : const Color(0xFF0F172A).withValues(alpha: 0.16),
+                    blurRadius: selected ? 10 : 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            );
-          },
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  final t = selected ? _controller.value : 0.0;
+                  return CustomPaint(
+                    size: const Size(22, 22),
+                    painter: _NavOrbitalSunPainter(
+                      spin: t,
+                      pulse:
+                          selected ? (math.sin(t * 4 * math.pi) + 1) / 2 : 0.0,
+                      selected: selected,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
         ),
       ),
     );

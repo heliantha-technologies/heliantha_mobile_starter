@@ -9,6 +9,7 @@ import '../../../shared/theme/app_tokens.dart';
 import '../../../shared/utils/friendly_errors.dart';
 import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
+import '../../notifications/providers/notifications_provider.dart';
 import '../../notifications/services/fcm_service.dart';
 import '../providers/auth_provider.dart';
 
@@ -59,6 +60,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             password: password,
           );
       ref.invalidate(currentUserProvider);
+      ref.invalidate(notificationsProvider);
       if (mounted) {
         context.replace(_safeRedirect(widget.redirectLocation));
       }

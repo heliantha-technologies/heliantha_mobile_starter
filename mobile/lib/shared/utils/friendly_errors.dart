@@ -26,6 +26,44 @@ FriendlyError friendlyLoadError(Object? error) {
   );
 }
 
+bool isAuthFailure(Object? error) {
+  return error is DioException &&
+      (error.response?.statusCode == 401 ||
+          error.response?.statusCode == 403);
+}
+
+FriendlyError friendlyNotificationsError(Object? error) {
+  if (isAuthFailure(error)) {
+    return const FriendlyError(
+      title: 'Session expirée',
+      message:
+          'Votre session a expiré. Reconnectez-vous pour consulter vos notifications.',
+    );
+  }
+
+  if (error is DioException && _isConnectionFailure(error)) {
+    return const FriendlyError(
+      title: 'Connexion Internet indisponible',
+      message:
+          'Vérifiez votre connexion réseau puis réessayez d’actualiser vos notifications.',
+    );
+  }
+
+  if (error is DioException && (error.response?.statusCode ?? 0) >= 500) {
+    return const FriendlyError(
+      title: 'Actualisation momentanément indisponible',
+      message:
+          'Le service de notifications rencontre une difficulté temporaire. Veuillez réessayer dans quelques instants.',
+    );
+  }
+
+  return const FriendlyError(
+    title: 'Actualisation impossible pour le moment',
+    message:
+        'Nous n’avons pas pu récupérer vos notifications. Veuillez réessayer.',
+  );
+}
+
 String friendlyLoginMessage() {
   return 'Vérifiez votre adresse e-mail et votre mot de passe.';
 }

@@ -74,9 +74,8 @@ class MaintenanceNotifier extends StateNotifier<MaintenanceStatus> {
   void resume() {
     if (_running) return;
     _running = true;
-    if (state == MaintenanceStatus.available) {
-      state = MaintenanceStatus.checking;
-    }
+    // Conserve l'état `available` déjà ouvert pour ne pas basculer l'arbre en Offstage
+    // (ce qui détacherait le FocusScope / clavier virtuel lors d'un retour sur l'onglet).
     unawaited(_check(initial: true));
   }
 
@@ -89,6 +88,9 @@ class MaintenanceNotifier extends StateNotifier<MaintenanceStatus> {
 
   void retry() {
     pause();
+    if (state != MaintenanceStatus.available) {
+      state = MaintenanceStatus.checking;
+    }
     resume();
   }
 

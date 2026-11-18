@@ -49,12 +49,16 @@ class FcmService {
     }
 
     _initialized = true;
-    await _initLocalNotifications(router);
-    await _requestPermission();
-    _listenTokenRefresh();
-    _listenForegroundMessages();
-    _listenOpenedMessages(router);
-    await _handleInitialMessage(router);
+    try {
+      await _initLocalNotifications(router);
+      await _requestPermission();
+      _listenTokenRefresh();
+      _listenForegroundMessages();
+      _listenOpenedMessages(router);
+      await _handleInitialMessage(router);
+    } catch (_) {
+      // Firebase/FCM initialization must remain non-blocking when unconfigured.
+    }
   }
 
   Future<void> _initLocalNotifications(GoRouter router) async {

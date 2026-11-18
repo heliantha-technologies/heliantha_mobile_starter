@@ -5,19 +5,105 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/router/navigation_helpers.dart';
 import '../../../shared/models/notification_item.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_tokens.dart';
 import '../../../shared/utils/friendly_errors.dart';
 import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../providers/notifications_provider.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
+  void _retry(WidgetRef ref) {
+    ref.invalidate(currentUserProvider);
+    ref.invalidate(notificationsProvider);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(currentUserProvider);
+
+    if (authState.isLoading) {
+      return const Scaffold(
+        appBar: AppTopBar(
+          subtitle: 'Notifications',
+          showBack: true,
+          backFallbackLocation: '/account',
+        ),
+        body: SafeArea(
+          child: _NotificationsSkeleton(),
+        ),
+      );
+    }
+
+    if (authState.hasError) {
+      final friendly = friendlyNotificationsError(authState.error);
+      return Scaffold(
+        appBar: const AppTopBar(
+          subtitle: 'Notifications',
+          showBack: true,
+          backFallbackLocation: '/account',
+        ),
+        body: SafeArea(
+          child: ResponsivePagePadding(
+            child: AppStatusPanel(
+              icon: Icons.cloud_off_rounded,
+              title: friendly.title,
+              message: friendly.message,
+              action: OutlinedButton.icon(
+                onPressed: () => _retry(ref),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Réessayer'),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (authState.valueOrNull == null) {
+      return Scaffold(
+        appBar: const AppTopBar(
+          subtitle: 'Notifications',
+          showBack: true,
+          backFallbackLocation: '/account',
+        ),
+        body: SafeArea(
+          child: ResponsivePagePadding(
+            child: AppStatusPanel(
+              icon: Icons.lock_outline_rounded,
+              title: 'Connexion requise',
+              message:
+                  'Connectez-vous à votre espace client pour recevoir le suivi de vos commandes, l’état de vos paiements et vos alertes de disponibilité.',
+              action: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () =>
+                        context.push(loginLocationFor('/notifications')),
+                    icon: const Icon(Icons.login_rounded),
+                    label: const Text('Se connecter'),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () => context.push(
+                      '/register?redirect=${Uri.encodeComponent('/notifications')}',
+                    ),
+                    icon: const Icon(Icons.person_add_alt_1_rounded),
+                    label: const Text('Créer un compte'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final notifications = ref.watch(notificationsProvider);
 
     return Scaffold(
@@ -26,69 +112,114 @@ class NotificationsScreen extends ConsumerWidget {
         showBack: true,
         backFallbackLocation: '/account',
       ),
-      body: notifications.when(
-        loading: () => const _NotificationsSkeleton(),
-        error: (error, __) {
-          final friendly = friendlyLoadError(error);
-          return ResponsivePagePadding(
-            child: AppStatusPanel(
-              icon: Icons.notifications_off_outlined,
-              title: friendly.title,
-              message: friendly.message,
-              action: OutlinedButton.icon(
-                onPressed: () => ref.invalidate(notificationsProvider),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Réessayer'),
-              ),
-            ),
-          );
-        },
-        data: (result) {
-          if (result.items.isEmpty) {
-            return const ResponsivePagePadding(
+      body: SafeArea(
+        child: notifications.when(
+          skipLoadingOnRefresh: false,
+          loading: () => const _NotificationsSkeleton(),
+          error: (error, __) {
+            final friendly = friendlyNotificationsError(error);
+            final expired = isAuthFailure(error);
+            return ResponsivePagePadding(
               child: AppStatusPanel(
-                icon: Icons.notifications_none_rounded,
-                title: 'Aucune notification',
-                message:
-                    'Vos alertes de commande et de disponibilité apparaîtront ici.',
+                icon: expired
+                    ? Icons.lock_clock_outlined
+                    : Icons.notifications_off_outlined,
+                title: friendly.title,
+                message: friendly.message,
+                action: expired
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: () => context.push(
+                              loginLocationFor('/notifications'),
+                            ),
+                            icon: const Icon(Icons.login_rounded),
+                            label: const Text('Se reconnecter'),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed: () => _retry(ref),
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Réessayer'),
+                          ),
+                        ],
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: () => _retry(ref),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Réessayer'),
+                      ),
               ),
             );
-          }
-
-          return SingleChildScrollView(
-            child: ResponsivePagePadding(
-              bottom: 96,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _NotificationsHeader(
-                    unread: result.unread,
-                    total: result.items.length,
-                  ),
-                  const SizedBox(height: 14),
-                  for (final item in result.items) ...[
-                    _NotificationTile(
-                      item: item,
-                      onTap: () {
-                        unawaited(
-                          ref
-                              .read(notificationsRepositoryProvider)
-                              .markRead(item.id)
-                              .catchError((error) {
-                            debugPrint('Notification mark-read error: $error');
-                          }),
-                        );
-                        ref.invalidate(notificationsProvider);
-                        _openNotification(context, item);
-                      },
+          },
+          data: (result) {
+            if (result.items.isEmpty) {
+              return RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(notificationsProvider);
+                  await ref.read(notificationsProvider.future);
+                },
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    ResponsivePagePadding(
+                      child: AppStatusPanel(
+                        icon: Icons.notifications_none_rounded,
+                        title: 'Aucune notification',
+                        message:
+                            'Vos alertes de commande et de disponibilité apparaîtront ici.',
+                      ),
                     ),
-                    if (item != result.items.last) const SizedBox(height: 12),
                   ],
-                ],
+                ),
+              );
+            }
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(notificationsProvider);
+                await ref.read(notificationsProvider.future);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ResponsivePagePadding(
+                  bottom: 96,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _NotificationsHeader(
+                        unread: result.unread,
+                        total: result.items.length,
+                      ),
+                      const SizedBox(height: 14),
+                      for (final item in result.items) ...[
+                        _NotificationTile(
+                          item: item,
+                          onTap: () {
+                            unawaited(
+                              ref
+                                  .read(notificationsRepositoryProvider)
+                                  .markRead(item.id)
+                                  .catchError((error) {
+                                debugPrint(
+                                    'Notification mark-read error: $error');
+                              }),
+                            );
+                            ref.invalidate(notificationsProvider);
+                            _openNotification(context, item);
+                          },
+                        ),
+                        if (item != result.items.last)
+                          const SizedBox(height: 12),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

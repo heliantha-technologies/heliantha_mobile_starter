@@ -13,6 +13,7 @@ import '../../../shared/widgets/app_ui.dart';
 import '../../../shared/widgets/brand_widgets.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../notifications/presentation/notification_bell.dart';
+import '../../notifications/providers/notifications_provider.dart';
 import '../../notifications/services/fcm_service.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -50,6 +51,7 @@ class AccountScreen extends ConsumerWidget {
             await ref.read(fcmServiceProvider).unregisterCurrentDevice();
             await ref.read(authRepositoryProvider).logout();
             ref.invalidate(currentUserProvider);
+            ref.invalidate(notificationsProvider);
             if (context.mounted) {
               AppFeedback.info(context, 'À bientôt');
             }
@@ -180,8 +182,8 @@ class _AccountBody extends StatelessWidget {
         }
 
         // Mobile : pleine largeur moderne et aligné en haut, sans scroll sur formats standards (ex. 390x844),
-        // et active le scroll uniquement si l'écran est très compact ou la police agrandie.
-        final baseRequiredHeight = loggedIn ? 595.0 : 540.0;
+        // et active le scroll automatiquement sur les écrans mobiles plus courts (barres navigateur iOS/Android) ou police agrandie.
+        final baseRequiredHeight = loggedIn ? 610.0 : 555.0;
         final adjustedRequired =
             baseRequiredHeight + (textScale - 1.0).clamp(0.0, 1.0) * 160.0;
         final needsScroll = height < adjustedRequired || textScale > 1.20;

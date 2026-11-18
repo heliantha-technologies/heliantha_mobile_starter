@@ -171,14 +171,13 @@ class _QuoteProjectSelectorScreenState
                           (textScale - 1.0).clamp(0.0, 1.0) * 18.0;
                       final heroGap = isDesktop ? 14.0 : 8.0;
 
-                      // Réserve un espace bas pour éviter que l'orbe IA recouvre la 6e carte sur mobile.
                       final double bottomPadding;
                       if (isDesktop) {
                         bottomPadding = 22.0;
-                      } else if (height >= 640) {
-                        bottomPadding = 68.0;
+                      } else if (height >= 700) {
+                        bottomPadding = 24.0;
                       } else {
-                        bottomPadding = 10.0;
+                        bottomPadding = 12.0;
                       }
 
                       final effectiveWidth =
@@ -196,7 +195,7 @@ class _QuoteProjectSelectorScreenState
                           totalGaps -
                           bottomPadding;
 
-                      final minComfortHeight = (isDesktop ? 185.0 : 132.0) +
+                      final minComfortHeight = (isDesktop ? 185.0 : 140.0) +
                           (textScale - 1.0).clamp(0.0, 1.0) * 86.0;
                       final maxCardHeight = isDesktop ? 250.0 : 210.0;
                       final rawCardHeight = availableForGrid / rowCount;

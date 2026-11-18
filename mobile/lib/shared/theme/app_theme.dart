@@ -78,7 +78,7 @@ class AppTheme {
         centerTitle: false,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 64,
+        height: 68,
         backgroundColor: AppColors.surfaceGlow,
         surfaceTintColor: Colors.transparent,
         indicatorColor: AppColors.softSun,
